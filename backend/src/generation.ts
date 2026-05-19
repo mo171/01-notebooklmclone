@@ -11,12 +11,7 @@ import { response_generator_promt } from "./prompt.ts";
 
 const query = "What is Prompt engineering";
 
-const llm = new ChatMistralAI({
-    model: "mistral-large-latest",
-    temperature: 0.5,
-    maxRetries: 2,
-    apiKey: process.env.MISTRAL_API_KEY
-});
+
 
 
 const generate_question_prompt = PromptTemplate.fromTemplate(`
@@ -32,32 +27,13 @@ const generate_question_prompt = PromptTemplate.fromTemplate(`
 
 
 
-const generateQuestionPromt = await generate_question_prompt.invoke({
-    question: query,
-})
 
-const questionsSchema = z.object({
-    questions: z.array(z.string()),
-});
-const structuredLlm = llm.withStructuredOutput(questionsSchema);
 
-const parsedResult = await structuredLlm.invoke([
-    {
-        role: "user",
-        content: generateQuestionPromt.value,
-    },
-]);
 
-const questions = parsedResult?.questions
 
-const allRetrievedDocs = [] as Document[][]
 
-for (const question of questions ?? []) {
-  const retrieved = await queryVectorDB(question);
-  allRetrievedDocs.push(retrieved);
-}
 
-const fusedDoc = reciprocalRankFusion(allRetrievedDocs);
+
 
 function formatDocumentsAsString(docs: Document[]) {
   return docs.map((doc) => doc.pageContent).join("\n\n");

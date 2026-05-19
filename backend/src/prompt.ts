@@ -18,4 +18,7 @@ Your task:
 3. Synthesize a single, coherent answer that directly addresses the user's original question
 4. If different queries highlight different aspects, integrate them into one clear example
 5. Be concise, structured, and clear. When useful, cite or reference information from the context.
+
+IMPORTANT: You must return the output as a JSON object with two keys: "reasoning" (your step-by-step thinking) and "answer" (the final response).
+Example format: {{"reasoning": "...", "answer": "..."}}
 `)
