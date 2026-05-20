@@ -13,7 +13,7 @@ dotenv.config();
 import { queryVectorDB, rerankDocuments } from "./retriever.ts";
 import { reciprocalRankFusion } from "./RRF.ts";
 import { Document } from "@langchain/core/documents";
-import { response_generator_promt } from "./prompt.ts";
+import { response_generator_promt } from "./app/pipeline/prompt.js";
 import {
   extractMessage,
   generateResponseFormatter,
