@@ -1,9 +1,8 @@
+import { Express } from "express";
+import { dbConnection } from "./mongoose/dbConnection";
+import { ExpressServer } from "./express/expressServer";
 
-
-import { Express } from 'express';
-import { ExpressServer } from './express/expressServer';
-
-export function bootStrapApp(app: Express, PORT: number) {
-
-        ExpressServer(app, PORT);
+export async function bootStrapApp(app: Express, PORT: number) {
+  await dbConnection();
+  ExpressServer(app, PORT);
 }

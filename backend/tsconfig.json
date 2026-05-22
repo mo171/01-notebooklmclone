@@ -8,11 +8,14 @@
       "strict": true,
       "outDir": "dist",
       "rootDir": "src",
+      "baseUrl": ".",
       "paths": {
-        "@/*": ["./src/*"]
-      },
-  
+        "@/*": ["src/*"]
+      }
     },
-    "include": ["src",],
+    "ts-node": {
+      "require": ["tsconfig-paths/register"]
+    },
+    "include": ["src"],
     "exclude": ["node_modules"]
   }
