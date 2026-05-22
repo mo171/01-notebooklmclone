@@ -1,3 +1,4 @@
+import { Document } from "@langchain/core/documents";
 import { ChatOpenAI } from "@langchain/openai";
 import z from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
@@ -44,15 +45,15 @@ export const TranformResponseFormatter = {
   },
 } as any;
 
-export function splitListOfDocs(docs, chunkSize) {
-  const chunks = [];
+export function splitListOfDocs(docs: Document[], chunkSize: number) {
+  const chunks: Document[][] = [];
   for (let i = 0; i < docs.length; i += chunkSize) {
     chunks.push(docs.slice(i, i + chunkSize));
   }
   return chunks;
 }
 
-export function collapseDocs(docs) {
+export function collapseDocs(docs: Document[]) {
   return docs.map((doc) => doc.pageContent).join("\n\n");
 }
 

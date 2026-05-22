@@ -1,5 +1,6 @@
-import express from "express";
 import "dotenv/config";
+import "@/types/express-augment";
+import express from "express";
 import { bootStrapApp } from "./app/bootstrap/index";
 
 const app = express();

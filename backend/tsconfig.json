@@ -7,8 +7,8 @@
       "allowSyntheticDefaultImports": true,
       "strict": true,
       "outDir": "dist",
-      "rootDir": "src",
       "baseUrl": ".",
+      "ignoreDeprecations": "5.0",
       "paths": {
         "@/*": ["src/*"]
       }
@@ -16,6 +16,6 @@
     "ts-node": {
       "require": ["tsconfig-paths/register"]
     },
-    "include": ["src"],
-    "exclude": ["node_modules"]
+    "include": ["src", "scripts"],
+    "exclude": ["node_modules", "dist"]
   }

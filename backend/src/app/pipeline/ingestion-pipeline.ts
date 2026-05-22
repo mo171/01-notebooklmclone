@@ -47,5 +47,3 @@ export async function webFileEmbedding(url: string) {
 
   
 }
-
-webFileEmbedding("https://aws.amazon.com/what-is/prompt-engineering/");

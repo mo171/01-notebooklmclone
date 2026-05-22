@@ -1,3 +1,4 @@
+import "@/types/express-augment";
 import { NextFunction, Response, Request } from "express";
 import jwt from "jsonwebtoken";
 import { Types } from "mongoose";

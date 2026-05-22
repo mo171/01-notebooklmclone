@@ -1,3 +1,4 @@
+import path from "path";
 import cors from "cors";
 import express, {
   type Express,
@@ -63,6 +64,8 @@ export function ExpressServer(app: Express, PORT: number) {
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
+  app.use("/public", express.static(path.join(process.cwd(), "public")));
+
   app.get("/", (_req: Request, res: Response) => {
     res.json({ message: "express server is up" });
   });
@@ -102,7 +105,7 @@ export function ExpressServer(app: Express, PORT: number) {
               profile as unknown as GoogleUserType,
               { accessToken, refreshToken: refreshToken || undefined },
             );
-          done(null, authData);
+          done(null, authData as Express.User);
         } catch (err) {
           done(err as Error);
         }
@@ -138,9 +141,7 @@ export function ExpressServer(app: Express, PORT: number) {
       session: true,
     }),
     (req: Request, res: Response) => {
-      const authData = req.user as {
-        token: { accessToken: string; refreshToken: string };
-      };
+      const authData = req.user as unknown as Express.User;
 
       const redirectUrl = new URL(frontendUrl);
       redirectUrl.searchParams.set("accessToken", authData.token.accessToken);

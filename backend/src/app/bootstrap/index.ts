@@ -1,8 +1,10 @@
 import { Express } from "express";
 import { dbConnection } from "./mongoose/dbConnection";
 import { ExpressServer } from "./express/expressServer";
+import { startAgenda } from "./agenda/agenda";
 
 export async function bootStrapApp(app: Express, PORT: number) {
   await dbConnection();
+  await startAgenda();
   ExpressServer(app, PORT);
 }
