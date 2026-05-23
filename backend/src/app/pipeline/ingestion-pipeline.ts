@@ -7,17 +7,9 @@ import "dotenv/config";
 
 
 
-export async function webFileEmbedding(url: string) {
-
-    const loader = new CheerioWebBaseLoader(url, {
-        selector: "main",
-      });
-      
-      const docs = await loader.load();
-      
-      docs.forEach((doc) => {
-        doc.pageContent = doc.pageContent.replace(/\s+/g, " ").trim();
-      });   
+export async function ingestTextToPinecone(text: string, metadata: Record<string, any> = {}) {
+  // Replace large empty spaces
+  const cleanedText = text.replace(/\s+/g, " ").trim();
 
   // chunkoverlap: we use it in order to preverse the meaning of the chunk
   const textSplitter = new RecursiveCharacterTextSplitter({
@@ -25,6 +17,7 @@ export async function webFileEmbedding(url: string) {
     chunkOverlap: 200,
   });
 
+  const docs = await textSplitter.createDocuments([cleanedText], [metadata]);
   const allSplits = await textSplitter.splitDocuments(docs);
 
   const embeddings = new HuggingFaceTransformersEmbeddings({

@@ -8,17 +8,7 @@ import { CheerioWebBaseLoader } from "@langchain/community/document_loaders/web/
 import { ChatOpenAI } from "@langchain/openai";
 import "dotenv/config";
 
-// ── Load & split the web page ────────────────────────────────────────────────
-
-const loader = new CheerioWebBaseLoader(
-  "https://lilianweng.github.io/posts/2023-03-15-prompt-engineering",
-);
-const docs = await loader.load();
-const textSplitter = new RecursiveCharacterTextSplitter({
-  chunkSize: 1000,
-  chunkOverlap: 200,
-});
-const splitDocs = await textSplitter.splitDocuments(docs);
+// ── LLM ──────────────────────────────────────────────────────────────────────
 
 // ── LLM ──────────────────────────────────────────────────────────────────────
 
@@ -170,11 +160,20 @@ const graph = new StateGraph(OverallState)
 
 const app = graph.compile();
 
-// ── Run the pipeline ─────────────────────────────────────────────────────────
+// ── Exported Pipeline ────────────────────────────────────────────────────────
 
-const result = await app.invoke({
-  contents: splitDocs.map((doc) => doc.pageContent),
-});
+export async function generateSummaryPipeline(content: string): Promise<string> {
+  const textSplitter = new RecursiveCharacterTextSplitter({
+    chunkSize: 1000,
+    chunkOverlap: 200,
+  });
+  
+  const docs = await textSplitter.createDocuments([content]);
+  const splitDocs = await textSplitter.splitDocuments(docs);
 
-console.log("Final Summary:\n");
-console.log(result.finalSummary);
+  const result = await app.invoke({
+    contents: splitDocs.map((doc) => doc.pageContent),
+  });
+
+  return result.finalSummary;
+}

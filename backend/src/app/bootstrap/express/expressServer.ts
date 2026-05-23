@@ -1,3 +1,4 @@
+import http from "http";
 import path from "path";
 import cors from "cors";
 import express, {
@@ -17,6 +18,7 @@ import {
 import { UserRepository } from "@/app/http/controllers/auth/repository/userRespository";
 import { GoogleUserType } from "@/types/user-types";
 import { apiV1 } from "@/routes/apiV1";
+import { initSocketIO } from "@/app/http/websockets/chatHandler";
 
 export function ExpressServer(app: Express, PORT: number) {
   const isProduction = process.env.NODE_ENV === "production";
@@ -158,7 +160,13 @@ export function ExpressServer(app: Express, PORT: number) {
     },
   );
 
-  app.listen(PORT, () => {
+  const httpServer = http.createServer(app);
+
+  // Initialise socket.io for real-time chat (Q&A over document)
+  initSocketIO(httpServer, frontendUrl);
+
+  httpServer.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
+    console.log(`Socket.io ready on ws://localhost:${PORT}`);
   });
 }

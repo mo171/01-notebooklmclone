@@ -232,30 +232,8 @@ async function generateMindElixirMindMap(
 	throw new Error(`Failed to generate a valid mind map: ${lastError}`);
 }
 
-// ── Example run ─────────────────────────────────────────────────────────────
+// ── Exported Pipeline ─────────────────────────────────────────────────────────────
 
-const studyGuideText = `Advanced Prompt Engineering & Augmented Language Models
-
-1. Core Principles
-Prompt engineering is the strategic design of inputs to guide a Large Language Model (LLM) toward a desired output.
-
-2. Foundational Prompting Techniques
-Zero-Shot Prompting: Ask the model to perform a task without examples.
-Few-Shot Prompting: Provide a few input-output examples.
-Instruction Prompting: Use explicit constraints and format requirements.
-
-3. Advanced Reasoning
-Chain-of-Thought prompting encourages step-by-step reasoning for complex tasks.
-
-4. Retrieval-Augmented Generation (RAG)
-RAG combines external knowledge retrieval with generation to improve factuality.`;
-
-try {
-	const mindMap = await generateMindElixirMindMap(studyGuideText);
-	// IMPORTANT: Print JSON only (stdout) so the frontend can consume it directly.
-	process.stdout.write(JSON.stringify(mindMap, null, 2));
-} catch (err) {
-	console.error(err);
-	process.exitCode = 1;
+export async function generateMindMapPipeline(content: string): Promise<any> {
+	return await generateMindElixirMindMap(content);
 }
-

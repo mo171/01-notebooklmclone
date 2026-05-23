@@ -221,14 +221,5 @@ builder.addEdge("transformQuery", "webSearch");
 builder.addEdge("webSearch", "generate");
 builder.addEdge("generate", END);
 
-// Compile
-const app = builder.compile();
-
-const result = await app.invoke(
-  {
-    messages: [new HumanMessage({ content: "Types of Prompt engineering" })],
-  },
-  generateResponseFormatter,
-);
-
-console.log("result : ", result);
+// Export the compiled graph app so it can be used by the WebSocket handler
+export const chatGraphApp = builder.compile();
