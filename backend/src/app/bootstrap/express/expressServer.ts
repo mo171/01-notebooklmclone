@@ -19,6 +19,7 @@ import { UserRepository } from "@/app/http/controllers/auth/repository/userRespo
 import { GoogleUserType } from "@/types/user-types";
 import { apiV1 } from "@/routes/apiV1";
 import { initSocketIO } from "@/app/http/websockets/chatHandler";
+import { requestLogger } from "@/app/helpers/requestLogger";
 
 export function ExpressServer(app: Express, PORT: number) {
   const isProduction = process.env.NODE_ENV === "production";
@@ -65,6 +66,7 @@ export function ExpressServer(app: Express, PORT: number) {
 
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
+  app.use(requestLogger);
 
   app.use("/public", express.static(path.join(process.cwd(), "public")));
 

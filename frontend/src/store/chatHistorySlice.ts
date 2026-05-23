@@ -32,7 +32,7 @@ const chatHistorySlice = createSlice({
    
 
 
-    addMessageInChatHistory: (state, action) => {
+    addMessageInChatHistory: (state, action: PayloadAction<{ role: string; content: string }>) => {
       if (!state.chatHistory) {
         state.chatHistory = { chatHistory: [] };
       }
@@ -41,8 +41,13 @@ const chatHistorySlice = createSlice({
       }
       state.chatHistory.chatHistory.push(action.payload);
     },
-
-
+    removeLastChatMessage: (state) => {
+      state.chatHistory?.chatHistory?.pop();
+    },
+    clearChatHistory: (state) => {
+      state.chatHistory = null;
+      state.error = null;
+    },
   },
   extraReducers: (builder) => {
     builder .addCase(fetchChats.pending, (state) => {
@@ -50,7 +55,7 @@ const chatHistorySlice = createSlice({
         state.error = null;
       })
       .addCase(fetchChats.fulfilled, (state, action: PayloadAction<chatHistoryType | undefined>) => {
-        state.chatHistory = action.payload;
+        state.chatHistory = action.payload ?? { chatHistory: [] };
         state.loading = false;
       })
       .addCase(fetchChats.rejected, (state, action) => {
@@ -61,7 +66,7 @@ const chatHistorySlice = createSlice({
   },
 })
 
-export const { addMessageInChatHistory} = chatHistorySlice.actions
+export const { addMessageInChatHistory, removeLastChatMessage, clearChatHistory } = chatHistorySlice.actions
 
 
 

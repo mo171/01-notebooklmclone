@@ -3,7 +3,7 @@ import { Types } from "mongoose";
 import { User } from "@/app/bootstrap/models/userSchema";
 import { NotesRepository } from "@/app/http/controllers/notes/repository/Notesrepository";
 import { loadNoteSource, type NoteSourceInput } from "./loader";
-import { generateTitle } from "./Titlegeneration";
+import { generateTitleSafely } from "./Titlegeneration";
 import { generateImagePrompt } from "./generatePrompt";
 import { generateImage } from "./generateImage";
 
@@ -50,7 +50,7 @@ export async function processNoteJob(data: ProcessNoteJobData): Promise<void> {
     }
 
     const { fullText, excerpt } = await loadNoteSource(sourceInput);
-    const title = await generateTitle(fullText);
+    const title = await generateTitleSafely(fullText, source.originalName ?? source.url ?? source.driveFileId ?? "Untitled Notebook");
     const imagePrompt = await generateImagePrompt(title);
     const imagePath = await generateImage(imagePrompt, noteId);
 

@@ -1,22 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { BaseModal } from "../../base/BaseModal"
-import { Button } from "../../ui/button"
-import { ClipboardMinus, HardDrive, Link2, Loader2, MoveLeft, Newspaper, Search, Youtube } from "lucide-react";
+import { ClipboardMinus, Link2, Loader2, Newspaper, Youtube } from "lucide-react";
 import type { AppDispatch, RootState } from "@/store";
 import { useDispatch, useSelector } from "react-redux";
 import { toggleAddSourceNoteModal } from "@/store/addSourceSlice";
-import useDrivePicker from 'react-google-drive-picker'
-import { apiUrl, developerKey, googleClientId } from "@/config/get-env";
-import { getUserData } from "@/helper/getUserData";
-
-import { Label } from "../../ui/label";
-import { Textarea } from "../../ui/textarea";
-import { uploadPickedFiles } from "@/api/notes";
+import { apiUrl } from "@/config/get-env";
+import { GoogleDriveSection } from "./GoogleDriveSection";
 import { AddPasteTextForm } from "./AddPasteTextForm";
 import AddWebLinkForm from "./AddWebLinkForm";
 import AddYoutubeLinkForm from "./AddYoutubeForm";
 import { showError, showInfo } from "@/util/toast-notification";
-import { fetchNoteSourceResult } from "@/store/rightPanelSlice";
+import { debugLog } from "@/helper/debugLog";
+import { fetchNoteSourceResult, setDocIds } from "@/store/rightPanelSlice";
 import { fetchSingleNote } from "@/store/chatSlice";
 
 
@@ -25,29 +20,6 @@ const CreateNoteModal = ({ noteId }: { noteId?: string }) => {
 
     const dispatch = useDispatch<AppDispatch>();
     const { modal } = useSelector((state: RootState) => state.addSource);
-    const userData = getUserData()
-
-
-
-    const [openPicker, data, authResponse] = useDrivePicker();
-    const handleOpenPicker = async () => {
-
-        openPicker({
-            clientId: googleClientId,
-            developerKey: developerKey,
-            viewId: "DOCS",
-            token: userData?.googleAccessToken,
-            showUploadView: true,
-            showUploadFolders: true,
-            supportDrives: true,
-            multiselect: true,
-        })
-
-        dispatch(toggleAddSourceNoteModal())
-
-
-    }
-
 
     const [dropZone, setDropZone] = useState(true)
     const [youtubeLinkForm, setYoutubeLinkForm] = useState(false)
@@ -98,22 +70,6 @@ const CreateNoteModal = ({ noteId }: { noteId?: string }) => {
     //paste text form
 
 
-    useEffect(() => {
-        if (!data?.docs?.length || !noteId) return;
-
-        (async () => {
-            try {
-                await uploadPickedFiles(data.docs, noteId);
-                await dispatch(fetchSingleNote(noteId));
-                dispatch(fetchNoteSourceResult(noteId));
-                showInfo("Google Drive file(s) added");
-            } catch {
-                showError("Failed to import Google Drive file(s)");
-            }
-        })();
-    }, [data, noteId, dispatch]);
-
-
     return (
 
 
@@ -160,16 +116,7 @@ const CreateNoteModal = ({ noteId }: { noteId?: string }) => {
 
                 {/* div card :actions buttons  */}
                 <div className="flex gap-2">
-                    <div className="flex-1  cursor-pointer rounded-md border border-gray-200 p-4">
-                        <div className="mb-5 ">
-                            <p className="text-gray-900">Google Workspace</p>
-                        </div>
-                        <button onClick={() => handleOpenPicker()} className="flex gap-2 bg-slate-100 p-2 rounded-md text-sm text-blue-600 font-semibold">
-                            <HardDrive></HardDrive>
-                            Google Drive
-
-                        </button>
-                    </div>
+                    {modal && <GoogleDriveSection noteId={noteId} />}
                     <div className="flex-1 rounded-md border border-gray-200 p-4">
                         <div className="flex gap-1 mb-5 ">
                             <Link2></Link2>
@@ -225,7 +172,9 @@ const UploadFileSection = ({ noteId }: { noteId?: string }) => {
 
     const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
         e.preventDefault();
+        e.stopPropagation();
         setIsDragging(false);
+        if (loading) return;
         const files = e.dataTransfer.files;
         if (files.length > 0) {
             uploadFiles(files);
@@ -241,10 +190,18 @@ const UploadFileSection = ({ noteId }: { noteId?: string }) => {
     };
 
     const uploadFiles = async (files: FileList) => {
+        debugLog("UploadFileSection", "uploadFiles called", {
+            noteId,
+            count: files.length,
+            names: Array.from(files).map((f) => f.name),
+        });
+
         if (!noteId) {
             showError("Open a notebook before uploading files");
             return;
         }
+
+        if (loading) return;
 
         setLoading(true);
         const formData = new FormData();
@@ -274,8 +231,27 @@ const UploadFileSection = ({ noteId }: { noteId?: string }) => {
             }
 
             showInfo(data?.message ?? "File uploaded successfully");
-            await dispatch(fetchSingleNote(noteId));
+            const noteResult = await dispatch(fetchSingleNote(noteId));
+            const uploadedIds = (data?.docs as Array<{ _id: string }> | undefined)?.map((d) => d._id) ?? [];
+            const allDocs =
+                (noteResult.payload as { note?: { docs?: Array<{ _id: string; source_type?: string }> } })?.note?.docs ??
+                [];
+            const selectableIds = allDocs
+                .filter(
+                    (d) =>
+                        !["mindmap", "faq", "summary", "studyguide", "briefing-doc", "audio"].includes(
+                            (d.source_type ?? "").toLowerCase(),
+                        ),
+                )
+                .map((d) => d._id);
+            const idsToSelect = selectableIds.length > 0 ? selectableIds : uploadedIds;
+            if (idsToSelect.length > 0) {
+                dispatch(setDocIds(idsToSelect));
+            }
             dispatch(fetchNoteSourceResult(noteId));
+            if (fileInputRef.current) {
+                fileInputRef.current.value = "";
+            }
             setLoading(false);
         } catch (error) {
             setLoading(false);
@@ -290,8 +266,11 @@ const UploadFileSection = ({ noteId }: { noteId?: string }) => {
 
 
 
-    const handleClick = () => {
-        fileInputRef.current?.click();
+    const handleClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!loading) {
+            fileInputRef.current?.click();
+        }
     };
 
     return (
@@ -345,7 +324,9 @@ const UploadFileSection = ({ noteId }: { noteId?: string }) => {
                 type="file"
                 ref={fileInputRef}
                 className="hidden"
+                accept=".pdf,.txt,.md,.markdown,.csv,.json,.html,.htm"
                 onChange={handleFileSelect}
+                onClick={(e) => e.stopPropagation()}
                 multiple
             />
         </div>

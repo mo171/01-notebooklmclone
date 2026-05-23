@@ -49,24 +49,21 @@ const NoteCard = ({ notebooks ,viewNoteDetail}: NoteCardProps) => {
                     {/* Image at top */}
                     <div className="h-24">
                       {note?.image && (
-  typeof note.image === "string" && note.image.startsWith("http")
-    ? (
-        
-
-         <img
-                            src={note.image || DefaultImage} // fallback if no image
-                            onError={(e) => {
-                                e.currentTarget.src = DefaultImage;
-                            }}
-                            className="pt-2"
-                            width={100}
-                        /> 
-      )
-    : (
-        <span style={{ fontSize: "4rem" }}>
-          {note.image}
-        </span>
-      )
+                                                typeof note.image === "string" && (note.image.startsWith("http") || note.image.startsWith("/"))
+                                                    ? (
+                                                        <img
+                                                            src={note.image || DefaultImage}
+                                                            onError={(e) => {
+                                                                e.currentTarget.src = DefaultImage;
+                                                            }}
+                                                            className="pt-2 h-24 w-full object-cover rounded-md"
+                                                        />
+                                                    )
+                                                    : (
+                                                        <span style={{ fontSize: "4rem" }}>
+                                                            {note.image}
+                                                        </span>
+                                                    )
 )}
                      
                     </div>

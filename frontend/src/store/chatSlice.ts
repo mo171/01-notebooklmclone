@@ -20,8 +20,9 @@ export const fetchDocOverviewAndQuestions = createAsyncThunk(
 
 const singleNoteState = {
   note: {} as NoteType,
+  noteLoading: false,
   loading: false,
-  error: null,
+  error: null as string | null,
 };
 
 
@@ -80,36 +81,35 @@ const chatSlice = createSlice({
   extraReducers: (builder) => {
     builder
       .addCase(fetchSingleNote.pending, (state) => {
+        state.noteLoading = true;
         state.loading = true;
         state.error = null;
       })
       .addCase(fetchSingleNote.fulfilled, (state, action: PayloadAction<{ note: NoteType }>) => {
         state.note = action.payload.note;
+        state.noteLoading = false;
         state.loading = false;
       })
       .addCase(fetchSingleNote.rejected, (state, action) => {
+        state.noteLoading = false;
         state.loading = false;
-        state.error = action.error.message || "Failed to fetch notes";
+        state.note = {} as NoteType;
+        state.error = action.error.message || "Failed to fetch note";
       })
 
 
 
       // doc overview and questions
 
-        builder
-      .addCase(fetchDocOverviewAndQuestions.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
+      .addCase(fetchDocOverviewAndQuestions.pending, () => {})
       .addCase(fetchDocOverviewAndQuestions.fulfilled, (state, action) => {
         state.aiResult = action.payload ?? {
           aiResult: { questions: [], doc_overview: "" },
         };
-        state.loading = false;
       })
       .addCase(fetchDocOverviewAndQuestions.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.error.message || "Failed to fetch notes";
+        state.aiResult = { aiResult: { questions: [], doc_overview: "" } };
+        state.error = action.error.message || "Failed to fetch overview";
       })
 
 

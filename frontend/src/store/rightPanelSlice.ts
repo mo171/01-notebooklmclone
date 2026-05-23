@@ -11,7 +11,7 @@ export const fetchNoteSourceResult = createAsyncThunk(
 
 
 const sourceNoteResultState = {
-    sources: {} as Array<{ total_source: number, content: string, noteId: string, userId: string }>,
+    sources: [] as Array<{ _id?: string; total_source: number; content: string; noteId: string; userId: string; title?: string; source_type?: string }>,
     loading: false,
     error: null,
     sourceModal: { modal: false, title: "", content: "", source_type: "" },
@@ -55,19 +55,20 @@ export const rightPanelSlice = createSlice({
         showSourceModalContent: (state, action: PayloadAction<{ title: string, content: string, source_type: string }>) => {
 
             if (action.payload.source_type.includes('mindMap')) {
-
+                state.mindMapModal.title = action.payload?.title
                 state.mindMapModal.content = action.payload?.content
+                state.mindMapModal.source_type = action.payload?.source_type
                 state.mindMapModal.modal = true
             }
-            else if (action.payload.source_type.includes('audio')) {
-                 state.audioCard.sourceSectionHeight-=40
-                state.audioCard.show = true
-                state.audioCard.title = action.payload?.title
-                state.audioCard.content = action.payload?.content
-                
-
+            else if (
+                action.payload.source_type.includes('audio') ||
+                action.payload.source_type.includes('briefing')
+            ) {
+                state.sourceModal.modal = true
+                state.sourceModal.title = action.payload?.title
+                state.sourceModal.content = action.payload?.content
+                state.sourceModal.source_type = action.payload?.source_type
             }
-
             else {
                 state.sourceModal.modal = true
                 state.sourceModal.title = action.payload?.title
@@ -80,14 +81,23 @@ export const rightPanelSlice = createSlice({
         addDocIds: (state, action: PayloadAction<string>) => {
             const exist = state.docIds.includes(action.payload)
             if (exist) {
-                const newArray = state.docIds.filter((pushId: string) => pushId !== action.payload)
-                state.docIds = newArray
-
+                state.docIds = state.docIds.filter((id: string) => id !== action.payload)
             } else {
                 state.docIds.push(action.payload)
             }
-
-        }
+        },
+        setDocIds: (state, action: PayloadAction<string[]>) => {
+            state.docIds = action.payload
+        },
+        clearDocIds: (state) => {
+            state.docIds = []
+        },
+        clearStudioState: (state) => {
+            state.sources = []
+            state.docIds = []
+            state.sourceModal = { modal: false, title: "", content: "", source_type: "" }
+            state.mindMapModal = { modal: false, title: "", content: "", source_type: "" }
+        },
     },
     extraReducers: (builder) => {
         builder
@@ -96,7 +106,9 @@ export const rightPanelSlice = createSlice({
                 state.error = null;
             })
             .addCase(fetchNoteSourceResult.fulfilled, (state, action) => {
-                state.sources = action.payload.sources;
+                state.sources = Array.isArray(action.payload?.sources)
+                    ? action.payload.sources
+                    : [];
                 state.loading = false;
             })
             .addCase(fetchNoteSourceResult.rejected, (state, action) => {
@@ -106,7 +118,7 @@ export const rightPanelSlice = createSlice({
     },
 })
 
-export const { addDocIds, showSourceModalContent, closeAudioCard, closeSourceModal, closeMindMap } = rightPanelSlice.actions
+export const { addDocIds, setDocIds, clearDocIds, clearStudioState, showSourceModalContent, closeAudioCard, closeSourceModal, closeMindMap } = rightPanelSlice.actions
 
 
 export default rightPanelSlice.reducer

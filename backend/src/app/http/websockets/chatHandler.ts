@@ -46,15 +46,16 @@ export function initSocketIO(httpServer: HttpServer, frontendUrl: string): Socke
         socket.emit("chat:start", { noteId });
 
         // Invoke the LangGraph chat pipeline
-        const result = await chatGraphApp.invoke(
-          {
-            messages: [new HumanMessage({ content: message })],
-          },
-        );
+        const result = await chatGraphApp.invoke({
+          messages: [new HumanMessage({ content: message })],
+          noteId: noteId ?? "",
+          userId: "",
+        });
 
-        // Extract the last AI message from the messages array
         const allMessages = result.messages ?? [];
-        const lastAIMessage = allMessages.filter((m: any) => m.constructor?.name === "AIMessage").pop();
+        const lastAIMessage = allMessages
+          .filter((m: { _getType?: () => string }) => m._getType?.() === "ai")
+          .pop();
         const answer = typeof lastAIMessage?.content === "string"
           ? lastAIMessage.content
           : "I was unable to generate a response.";

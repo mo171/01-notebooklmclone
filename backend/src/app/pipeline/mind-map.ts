@@ -1,6 +1,5 @@
 import { PromptTemplate } from "@langchain/core/prompts";
 import { ChatOpenAI } from "@langchain/openai";
-import { ChatFireworks } from "@langchain/community/chat_models/fireworks";
 import { z } from "zod";
 import "dotenv/config";
 
@@ -68,33 +67,20 @@ function collectTopicsViolations(
 	return violations;
 }
 
-function makeLLM() {
-	const fireworksKey = process.env.FIRE_WORKS_API_KEY;
+function createMindMapLlm() {
 	const openaiKey = process.env.OPENAI_API_KEY;
 
-	if (fireworksKey) {
-		return new ChatFireworks({
-			model: "accounts/fireworks/models/deepseek-v3p1",
-			temperature: 0.7,
-			apiKey: fireworksKey,
-		});
+	if (!openaiKey) {
+		throw new Error("Missing OPENAI_API_KEY. Mind map generation requires OpenAI.");
 	}
 
-	if (openaiKey) {
-		return new ChatOpenAI({
-			model: "gpt-4o-mini",
-			temperature: 0.5,
-			maxRetries: 2,
-			apiKey: openaiKey,
-		});
-	}
-
-	throw new Error(
-		"Missing API key. Set FIRE_WORKS_API_KEY (preferred) or OPENAI_API_KEY.",
-	);
+	return new ChatOpenAI({
+		model: "gpt-4o-mini",
+		temperature: 0.5,
+		maxRetries: 2,
+		apiKey: openaiKey,
+	});
 }
-
-const llm = makeLLM();
 
 const mindElixirShapeExample = `{
 	"nodeData": {
@@ -159,6 +145,7 @@ async function generateMindElixirMindMap(
 	studyGuideText: string,
 	maxAttempts = 3,
 ): Promise<MindElixirData> {
+	const llm = createMindMapLlm();
 	const chain = prompt.pipe(llm);
 
 	let lastBadOutput = "";
@@ -235,5 +222,8 @@ async function generateMindElixirMindMap(
 // ── Exported Pipeline ─────────────────────────────────────────────────────────────
 
 export async function generateMindMapPipeline(content: string): Promise<any> {
-	return await generateMindElixirMindMap(content);
+	const mindMap = await generateMindElixirMindMap(content);
+	console.log("[mind-map] generated payload:", JSON.stringify(mindMap, null, 2));
+	console.log("[mind-map] nodeData:", JSON.stringify(mindMap.nodeData, null, 2));
+	return mindMap;
 }

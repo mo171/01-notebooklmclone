@@ -6,8 +6,11 @@ import "dotenv/config";
 /**
  * Vector search only (no Cohere). Call {@link rerankDocuments} once on your fused candidate set.
  */
-export async function queryVectorDB(query: string): Promise<Document[]> {
-  return similaritySearch(query, 10);
+export async function queryVectorDB(
+  query: string,
+  filter?: { noteId?: string; userId?: string },
+): Promise<Document[]> {
+  return similaritySearch(query, 10, filter);
 }
 
 export async function rerankDocuments(

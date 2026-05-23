@@ -39,13 +39,13 @@ const creditMenuSlice = createSlice({
       })
       .addCase(fetchUserCreditAndPayment.fulfilled, (state, action: PayloadAction<{result:CreditMenuStateType}>) => {
 
-        console.log('result : :  ',action.payload)
-        state.result = action.payload.result;
+        state.result = action.payload?.result ?? { credits: 0, paymentType: null };
                 state.loading = false;
       })
       .addCase(fetchUserCreditAndPayment.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.error.message || "Failed to fetch notes";
+        state.result = { credits: 0, paymentType: null };
+        state.error = action.error.message || "Failed to fetch credits";
       });
       
   },

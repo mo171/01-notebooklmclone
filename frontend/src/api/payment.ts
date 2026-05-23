@@ -22,9 +22,11 @@ export async function buyCredit({ userId, email, amount }: { userId: string, ema
 
         const data = await makeHttpReq('POST', `charge-customer`, { userId, email, amount }) as { message: string }
         return data
-    } catch (error) {
-        showError(error?.message)
-
+    } catch (error: unknown) {
+        const message = error && typeof error === "object" && "message" in error
+            ? String((error as { message?: string }).message)
+            : "Payment failed";
+        showError(message);
     }
 }
 
@@ -34,8 +36,8 @@ export const getUserCreditAndPaymentMethod = async (userId: string) => {
 
         const data = await makeHttpReq('GET', `user-credits?userId=${userId}`)
         return data
-    } catch (error) {
-        showError(error?.error?.message)
+    } catch {
+        return { result: { credits: 0, paymentType: null } };
     }
 
 };

@@ -47,6 +47,7 @@ function getUser(req: Request, res: Response): InstanceType<typeof User> | null 
 /** GET /api/v1/chats/history?userId=...&noteId=... */
 export async function getChatHistory(req: Request, res: Response, next: NextFunction) {
   try {
+    console.log("[chatController] getChatHistory called", req.query);
     const user = getUser(req, res);
     if (!user) return;
 
@@ -80,14 +81,18 @@ export async function sendChatMessage(req: Request, res: Response, next: NextFun
       return res.status(400).json({ message: "Invalid noteId" });
     }
 
-    // Run the LangGraph RAG pipeline
+    console.log("[chatController] sendChatMessage", { noteId, query: query.slice(0, 120) });
+
+    // Run the LangGraph RAG pipeline scoped to this notebook
     const result = await chatGraphApp.invoke({
       messages: [new HumanMessage({ content: query })],
+      noteId,
+      userId: user._id.toString(),
     });
 
     const allMessages = result.messages ?? [];
     const lastAI = allMessages
-      .filter((m: any) => m.constructor?.name === "AIMessage")
+      .filter((m: { _getType?: () => string }) => m._getType?.() === "ai")
       .pop();
     const answer =
       typeof lastAI?.content === "string" ? lastAI.content : "I was unable to generate a response.";
@@ -111,6 +116,7 @@ export async function sendChatMessage(req: Request, res: Response, next: NextFun
 /** GET /api/v1/notes/docs/overview?noteId=... */
 export async function getDocOverview(req: Request, res: Response, next: NextFunction) {
   try {
+    console.log("[chatController] getDocOverview called", req.query);
     const user = getUser(req, res);
     if (!user) return;
 

@@ -16,10 +16,7 @@ import { Document } from "@langchain/core/documents";
 import { response_generator_promt } from "@/prompts/prompts";
 import {
   extractMessage,
-  generateResponseFormatter,
-  gradeDocResponseFormater,
   llm,
-  TranformResponseFormatter,
 } from "@/util/index";
 import {
   generate_question_prompt,
@@ -31,6 +28,21 @@ import { JsonOutputParser } from "@langchain/core/output_parsers";
 import { TavilySearchAPIRetriever } from "@langchain/community/retrievers/tavily_search_api";
 import { AIMessage, HumanMessage } from "@langchain/core/messages";
 // import { formatDocumentsAsString } from "langchain/util/document";
+
+function extractFirstJsonObject(text: string): string {
+  const first = text.indexOf("{");
+  const last = text.lastIndexOf("}");
+
+  if (first === -1 || last === -1 || last <= first) {
+    throw new Error("No JSON object found in model output");
+  }
+
+  return text.slice(first, last + 1);
+}
+
+function getModelText(response: unknown): string {
+  return String((response as any)?.content ?? response ?? "");
+}
 
 // nextNode,retrievedDoc,filteredDoc,transformQuery
 const StateAnnotation = Annotation.Root({
@@ -55,6 +67,12 @@ const StateAnnotation = Annotation.Root({
     default: () => [],
     reducer: (previousVal, nextVal) => previousVal.concat(nextVal),
   }),
+  noteId: Annotation<string>({
+    reducer: (previousVal, nextVal) => nextVal ?? previousVal ?? "",
+  }),
+  userId: Annotation<string>({
+    reducer: (previousVal, nextVal) => nextVal ?? previousVal ?? "",
+  }),
 });
 
 // create the graph
@@ -78,8 +96,13 @@ const RetrieverNode = async (state: typeof StateAnnotation.State) => {
 
   const allRetrievedDocs = [] as Document[][];
 
+  const searchFilter =
+    state.noteId || state.userId
+      ? { noteId: state.noteId || undefined, userId: state.userId || undefined }
+      : undefined;
+
   for (const question of questions ?? []) {
-    const retrieved = await queryVectorDB(question);
+    const retrieved = await queryVectorDB(question, searchFilter);
     allRetrievedDocs.push(retrieved);
   }
 
@@ -144,6 +167,11 @@ const webSearch = async (state: typeof StateAnnotation.State) => {
   const query =
     state.newQuery || (extractMessage(state, "human")?.content as string);
 
+  if (!process.env.TAVILY_API_KEY) {
+    console.warn("[qa-overdoc] TAVILY_API_KEY missing — skipping web search");
+    return { retrievedDoc: [] };
+  }
+
   const tool = new TavilySearchAPIRetriever({
     apiKey: process.env.TAVILY_API_KEY,
     k: 5,
@@ -173,18 +201,37 @@ const generate = async (state: typeof StateAnnotation.State) => {
   const formatDocumentsAsString = (docs: any[]) =>
     docs.map((doc) => doc.pageContent).join("\n\n");
 
-  const docToString = formatDocumentsAsString(state.retrievedDoc);
+  const docsForAnswer =
+    state.filteredDoc.length > 0 ? state.filteredDoc : state.retrievedDoc;
+  const docToString = formatDocumentsAsString(docsForAnswer);
 
-  const parser = new JsonOutputParser<{ reasoning: string, answer: string }>();
-  const chain = response_generator_promt.pipe(llm).pipe(parser);
+  const chain = response_generator_promt.pipe(llm);
   let result = { reasoning: "", answer: "Failed to generate answer." };
 
   try {
-    result = await chain.invoke({
+    const response = await chain.invoke({
       original_question: lastMessage.content,
       questions: state.generateQuestions.join("\n"),
       retrieved_docs: docToString,
     });
+
+    const rawText = getModelText(response);
+
+    try {
+      const parsed = JSON.parse(extractFirstJsonObject(rawText)) as {
+        reasoning?: string;
+        answer?: string;
+      };
+      result = {
+        reasoning: parsed.reasoning ?? "",
+        answer: parsed.answer ?? rawText,
+      };
+    } catch {
+      result = {
+        reasoning: "",
+        answer: rawText.trim() || "Failed to generate answer.",
+      };
+    }
   } catch (e) {
     console.error("Failed to parse generate response JSON:", e);
   }

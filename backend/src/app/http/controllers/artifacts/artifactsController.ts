@@ -19,16 +19,25 @@ function getUser(req: Request, res: Response): InstanceType<typeof User> | null 
   return user;
 }
 
-/** Fetch multiple Docs by their IDs, verifying they belong to the user */
+/** Fetch docs by IDs, scoped to user and optionally the notebook */
 async function getDocContents(
   docIds: string[],
-  userId: Types.ObjectId
+  userId: Types.ObjectId,
+  noteId?: string,
 ): Promise<InstanceType<typeof Doc>[]> {
   const objectIds = docIds
     .filter((id) => Types.ObjectId.isValid(id))
     .map((id) => new Types.ObjectId(id));
 
-  return Doc.find({ _id: { $in: objectIds }, userId });
+  const query: Record<string, unknown> = {
+    _id: { $in: objectIds },
+    userId,
+  };
+  if (noteId && Types.ObjectId.isValid(noteId)) {
+    query.noteId = new Types.ObjectId(noteId);
+  }
+
+  return Doc.find(query);
 }
 
 // ── Step-1 Check Endpoints (return ready_to_generate_source) ──────────────────
@@ -92,8 +101,8 @@ export async function saveSummaryToSources(req: Request, res: Response, next: Ne
       return res.status(400).json({ message: "noteId and docIds are required" });
     }
 
-    const docs = await getDocContents(docIds, user._id);
-    if (!docs.length) return res.status(404).json({ message: "No matching docs found" });
+    const docs = await getDocContents(docIds, user._id, noteId);
+    if (!docs.length) return res.status(404).json({ message: "No matching docs found for this notebook" });
 
     // Run pipeline on combined content, update each doc
     for (const doc of docs) {
@@ -110,6 +119,7 @@ export async function saveSummaryToSources(req: Request, res: Response, next: Ne
 /** POST /api/v1/notes/add/faq/sources — generate FAQ for selected docs */
 export async function saveFaqToSources(req: Request, res: Response, next: NextFunction) {
   try {
+    console.log("[artifactsController] saveFaqToSources called", req.body);
     const user = getUser(req, res);
     if (!user) return;
 
@@ -118,8 +128,8 @@ export async function saveFaqToSources(req: Request, res: Response, next: NextFu
       return res.status(400).json({ message: "noteId and docIds are required" });
     }
 
-    const docs = await getDocContents(docIds, user._id);
-    if (!docs.length) return res.status(404).json({ message: "No matching docs found" });
+    const docs = await getDocContents(docIds, user._id, noteId);
+    if (!docs.length) return res.status(404).json({ message: "No matching docs found for this notebook" });
 
     for (const doc of docs) {
       const content = doc.description ?? "";
@@ -143,8 +153,8 @@ export async function saveStudyGuideToSources(req: Request, res: Response, next:
       return res.status(400).json({ message: "noteId and docIds are required" });
     }
 
-    const docs = await getDocContents(docIds, user._id);
-    if (!docs.length) return res.status(404).json({ message: "No matching docs found" });
+    const docs = await getDocContents(docIds, user._id, noteId);
+    if (!docs.length) return res.status(404).json({ message: "No matching docs found for this notebook" });
 
     for (const doc of docs) {
       const content = doc.description ?? "";
@@ -160,31 +170,47 @@ export async function saveStudyGuideToSources(req: Request, res: Response, next:
 /** POST /api/v1/notes/add/briefingdoc/sources — generate briefing doc for selected docs */
 export async function saveBriefingDocToSources(req: Request, res: Response, next: NextFunction) {
   try {
+    console.log("[artifactsController] saveBriefingDocToSources called", req.body);
     const user = getUser(req, res);
     if (!user) return;
 
-    const { noteId, docIds } = req.body as { noteId?: string; docIds?: string[] };
+    const { noteId, docIds, type } = req.body as {
+      noteId?: string;
+      docIds?: string[];
+      type?: "audio" | "briefing-doc";
+    };
     if (!noteId || !docIds?.length) {
       return res.status(400).json({ message: "noteId and docIds are required" });
     }
 
-    const docs = await getDocContents(docIds, user._id);
-    if (!docs.length) return res.status(404).json({ message: "No matching docs found" });
+    const docs = await getDocContents(docIds, user._id, noteId);
+    if (!docs.length) return res.status(404).json({ message: "No matching docs found for this notebook" });
+
+    const isAudio = type === "audio";
 
     for (const doc of docs) {
       const content = doc.description ?? "";
       if (!content) continue;
       const briefingDoc = await generateBriefingDocPipeline(content);
-      await Doc.findByIdAndUpdate(doc._id, { briefingDoc });
+      const titlePrefix = isAudio ? "Audio Overview" : "Briefing Doc";
+      await Doc.findByIdAndUpdate(doc._id, {
+        briefingDoc,
+        title: `${titlePrefix}: ${doc.title}`,
+      });
     }
 
-    return res.json({ message: "Briefing doc generated and saved successfully" });
+    return res.json({
+      message: isAudio
+        ? "Audio overview generated successfully"
+        : "Briefing doc generated and saved successfully",
+    });
   } catch (err) { next(err); }
 }
 
 /** POST /api/v1/notes/add/mindmap/sources — generate mind map for selected docs */
 export async function saveMindMapToSources(req: Request, res: Response, next: NextFunction) {
   try {
+    console.log("[artifactsController] saveMindMapToSources called", req.body);
     const user = getUser(req, res);
     if (!user) return;
 
@@ -193,16 +219,40 @@ export async function saveMindMapToSources(req: Request, res: Response, next: Ne
       return res.status(400).json({ message: "noteId and docIds are required" });
     }
 
-    const docs = await getDocContents(docIds, user._id);
-    if (!docs.length) return res.status(404).json({ message: "No matching docs found" });
+    const docs = await getDocContents(docIds, user._id, noteId);
+    if (!docs.length) return res.status(404).json({ message: "No matching docs found for this notebook" });
+
+    let updatedCount = 0;
 
     for (const doc of docs) {
-      const content = doc.description ?? "";
-      if (!content) continue;
+      const content =
+        doc.description ??
+        doc.summary ??
+        doc.studyGuide ??
+        doc.briefingDoc ??
+        doc.FAQ ??
+        "";
+
+      if (!content.trim()) {
+        continue;
+      }
+
       const mindMap = await generateMindMapPipeline(content);
-      // Store mind map JSON as string
+      const mindMapJson = typeof mindMap === "string" ? mindMap : JSON.stringify(mindMap);
+      console.log("[artifactsController] mindMap nodeData:",
+        typeof mindMap === "string" ? mindMap : JSON.stringify(mindMap.nodeData, null, 2),
+      );
       await Doc.findByIdAndUpdate(doc._id, {
-        mindMap: typeof mindMap === "string" ? mindMap : JSON.stringify(mindMap),
+        mindMap: mindMapJson,
+        title: `Mind Map: ${doc.title}`,
+      });
+      console.log("[artifactsController] saved mindMap length:", mindMapJson.length);
+      updatedCount += 1;
+    }
+
+    if (updatedCount === 0) {
+      return res.status(400).json({
+        message: "No source text was available to generate a mind map",
       });
     }
 

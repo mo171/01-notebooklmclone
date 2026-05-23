@@ -6,7 +6,11 @@ import { NotesRepository } from "./repository/Notesrepository";
 
 function inferSourceType(doc: InstanceType<typeof Doc>) {
   if (doc.mindMap) return "mindMap";
-  if (doc.briefingDoc) return "audio";
+  if (doc.briefingDoc) {
+    return doc.title?.toLowerCase().includes("audio")
+      ? "audio"
+      : "briefing-doc";
+  }
   if (doc.summary) return "summary";
   if (doc.FAQ) return "faq";
   if (doc.studyGuide) return "studyguide";

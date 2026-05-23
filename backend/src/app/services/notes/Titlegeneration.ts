@@ -34,3 +34,30 @@ export async function generateTitle(text: string): Promise<string> {
   }
   return title;
 }
+
+export function buildFallbackTitle(source: string, fallback = "Untitled Source") {
+  const cleaned = source
+    .replace(/\.[^.]+$/, "")
+    .replace(/[._-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!cleaned) {
+    return fallback;
+  }
+
+  return cleaned
+    .split(" ")
+    .slice(0, 8)
+    .join(" ")
+    .replace(/^./, (char) => char.toUpperCase());
+}
+
+export async function generateTitleSafely(text: string, fallback: string) {
+  try {
+    return await generateTitle(text);
+  } catch (error) {
+    console.warn("[generateTitleSafely] Falling back to deterministic title", error);
+    return buildFallbackTitle(fallback);
+  }
+}

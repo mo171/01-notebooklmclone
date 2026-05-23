@@ -16,18 +16,18 @@ import { createBriefingDoc, createFAQ, createMindMap, createStudyGuide, createSu
 import type { AppDispatch, RootState } from "@/store";
 import { showError } from "@/util/toast-notification";
 import { useEffect, useState } from "react";
-import { fetchNoteSourceResult, closeSourceModal, showSourceModalContent } from "@/store/rightPanelSlice";
+import { fetchNoteSourceResult, showSourceModalContent } from "@/store/rightPanelSlice";
+import { debugLog } from "@/helper/debugLog";
 import { truncateTitle } from "@/util/truncateTitle";
 import { SourceModal } from "../note/rightpanel/SourceModal";
 import MindMapSourceModal from "../note/rightpanel/MindMapSourceModal";
-import AudioSection from "./AudioSection";
-import { apiUrl } from "@/config/get-env";
+import { showSuccess } from "@/util/toast-notification";
 
 const RightPanel = ({ noteId }: { noteId?: string }) => {
 
   const dispatch = useDispatch<AppDispatch>();
   const { rightPanelOpen } = useSelector((state: RootState) => state.chat);
-  const { docIds, sources, sourceModal, audioCard } = useSelector((state: RootState) => state.rightPanel);
+  const { docIds, sources } = useSelector((state: RootState) => state.rightPanel);
 
 
 
@@ -35,7 +35,8 @@ const RightPanel = ({ noteId }: { noteId?: string }) => {
     dispatch(showSourceModalContent(source))
   }
   function fetchSources() {
-    dispatch(fetchNoteSourceResult(noteId))
+    if (!noteId) return Promise.resolve();
+    return dispatch(fetchNoteSourceResult(noteId)).unwrap();
 
   }
 
@@ -55,25 +56,47 @@ const RightPanel = ({ noteId }: { noteId?: string }) => {
 const [audioLoading, setAudioLoading] = useState(false);
   const [mindMapLoading, setMindMapLoading] = useState(false);
 
-  async function generateMindMap() {
+  useEffect(() => {
+    if (!noteId) return;
+    fetchSources().catch((error) => {
+      debugLog("RightPanel", "failed to refresh sources", error);
+    });
+  }, [noteId]);
 
-   try {
-
-     if (docIds.length > 0) {
-      setMindMapLoading(true)
-      await createMindMap(noteId, docIds)
-      fetchSources()
-    } else {
-      showError("Please select a source");
+  async function openLatestMindMap() {
+    if (!noteId) return;
+    const result = await dispatch(fetchNoteSourceResult(noteId)).unwrap();
+    const mindMapSource = (result?.sources as Array<{ source_type?: string; content?: string; title?: string }> | undefined)
+      ?.find((s) => s.source_type?.toLowerCase().includes("mindmap"));
+    if (mindMapSource) {
+      dispatch(showSourceModalContent({
+        title: mindMapSource.title ?? "Mind Map",
+        content: mindMapSource.content ?? "",
+        source_type: "mindMap",
+      }));
     }
-    
-   } catch (error) {
-     showError("Failed to generate mind map");
-     setMindMapLoading(false)
-   }finally{
-     setMindMapLoading(false)
-   }
+  }
 
+  async function generateMindMap() {
+    debugLog("RightPanel", "generateMindMap clicked", { noteId, docIds });
+    if (!noteId) {
+      showError("Open a notebook first");
+      return;
+    }
+    if (docIds.length === 0) {
+      showError("Please select at least one source in the left panel");
+      return;
+    }
+    try {
+      setMindMapLoading(true);
+      await createMindMap(noteId, docIds);
+      await openLatestMindMap();
+      showSuccess("Mind map ready — view opened");
+    } catch {
+      showError("Failed to generate mind map");
+    } finally {
+      setMindMapLoading(false);
+    }
   }
 
 
@@ -82,23 +105,20 @@ const [audioLoading, setAudioLoading] = useState(false);
 
 
   async function generateAudio() {
-    if (docIds.length > 0) {
-      try {
-        setAudioLoading(true);
-
-
-        await createBriefingDoc(noteId, docIds, 'audio')
-
-        fetchSources()
-
-        setAudioLoading(false);
-
-      } catch (error) {
-        setAudioLoading(false);
-
-      }
-    } else {
-      showError("Please select a source");
+    debugLog("RightPanel", "generateAudio clicked", { noteId, docIds });
+    if (!noteId || docIds.length === 0) {
+      showError("Please select at least one source in the left panel");
+      return;
+    }
+    try {
+      setAudioLoading(true);
+      await createBriefingDoc(noteId, docIds, "audio");
+      await fetchSources();
+      showSuccess("Audio overview generated — click it in the list below to read");
+    } catch {
+      showError("Failed to generate audio overview");
+    } finally {
+      setAudioLoading(false);
     }
   }
 
@@ -144,21 +164,12 @@ const [audioLoading, setAudioLoading] = useState(false);
       </div>
 
 
-      {rightPanelOpen && (
-        <AudioSection
-          audioUrl={`${apiUrl}/api/v1/notes/read/audios/${audioCard?.content}`}
-          title={audioCard?.title}
-        />
-      )}
-
-
-
       <br />
 
       {rightPanelOpen ? (
 
 
-        sources?.length > 0 ? (<div className={`space-y-3 ${audioCard.show ? 'max-h-60' : 'max-h-100'}  overflow-y-auto  pb-10`}>
+        sources?.length > 0 ? (<div className="space-y-3 max-h-100 overflow-y-auto pb-10">
 
           {Array.isArray(sources) && sources.map((source) => (
 
@@ -262,37 +273,36 @@ const PanelItem = ({
 
 
 // / 🧾 Report menu (with dropdown)
-const ReportPanelItem = ({ rightPanelOpen, noteId, docIds, fetchSources }: { rightPanelOpen: boolean, noteId: string, docIds: string[], fetchSources: () => void }) => {
+const ReportPanelItem = ({ rightPanelOpen, noteId, docIds, fetchSources }: { rightPanelOpen: boolean, noteId?: string, docIds: string[], fetchSources: () => void }) => {
   const menuItems = ["Summary", "Study Guide", "Briefing Doc", "FAQ"];
   const [loading, setLoading] = useState(false);
 
   async function generateSource(item: string) {
-    if (docIds.length > 0) {
+    debugLog("ReportPanelItem", "generateSource clicked", { item, noteId, docIds });
+    if (!noteId) {
+      showError("Open a notebook first");
+      return;
+    }
+    if (docIds.length === 0) {
+      showError("Please select at least one source in the left panel");
+      return;
+    }
+    try {
       setLoading(true);
       if (item === "Summary") {
-
-
         await createSummary(noteId, docIds);
-
-
-
-      }
-      else if (item === "FAQ") {
-
-        await createFAQ(noteId, docIds)
+      } else if (item === "FAQ") {
+        await createFAQ(noteId, docIds);
       } else if (item === "Study Guide") {
-        await createStudyGuide(noteId, docIds)
+        await createStudyGuide(noteId, docIds);
+      } else if (item === "Briefing Doc") {
+        await createBriefingDoc(noteId, docIds, "briefing-doc");
       }
-      else if (item === "Briefing Doc") {
-        await createBriefingDoc(noteId, docIds, 'briefing-doc')
-      }
-
-
-      fetchSources()
-
+      await fetchSources();
+    } catch {
+      showError(`Failed to generate ${item}`);
+    } finally {
       setLoading(false);
-    } else {
-      showError("Please select a source");
     }
   }
 

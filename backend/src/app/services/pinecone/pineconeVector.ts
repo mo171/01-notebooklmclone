@@ -73,22 +73,42 @@ export async function upsertDocuments(
   }
 }
 
+export type VectorSearchFilter = {
+  noteId?: string;
+  userId?: string;
+};
+
 export async function similaritySearch(
   query: string,
   topK = 10,
+  filter?: VectorSearchFilter,
 ): Promise<Document[]> {
   const index = getPineconeIndex();
   if (!index) {
+    console.log("[pinecone] similaritySearch skipped — not configured");
     return [];
   }
 
   const embeddings = getEmbeddings();
   const vector = await embeddings.embedQuery(query);
 
+  const pineconeFilter: Record<string, string> = {};
+  if (filter?.noteId) pineconeFilter.noteId = filter.noteId;
+  if (filter?.userId) pineconeFilter.userId = filter.userId;
+
+  console.log("[pinecone] similaritySearch", {
+    query: query.slice(0, 80),
+    topK,
+    filter: pineconeFilter,
+  });
+
   const result = await index.query({
     vector,
     topK,
     includeMetadata: true,
+    ...(Object.keys(pineconeFilter).length > 0
+      ? { filter: pineconeFilter }
+      : {}),
   });
 
   return (result.matches ?? [])

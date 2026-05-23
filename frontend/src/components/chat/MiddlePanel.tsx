@@ -5,9 +5,10 @@ import { Copy, GitBranch, Loader2, Music2, NotebookTabs, SendHorizonal, Sparkles
 import { memo, useEffect, useRef, useState } from "react";
 import { Button } from "../ui/button";
 import { createBriefingDoc, createMindMap, createSummary, sendChatMessage, type chatHistoryType, type messageType, type questionAndDocOverviewType } from "@/api/notes";
-import { addMessageInChatHistory } from "@/store/chatHistorySlice";
+import { addMessageInChatHistory, removeLastChatMessage } from "@/store/chatHistorySlice";
 import type { NoteType } from "@/types/note-types";
-import { showError } from "@/util/toast-notification";
+import { showError, showSuccess } from "@/util/toast-notification";
+import { debugLog } from "@/helper/debugLog";
 import { fetchNoteSourceResult } from "@/store/rightPanelSlice";
 
 import ReactMarkdown from "react-markdown";
@@ -38,6 +39,7 @@ const MiddlePannel = ({ chatHistory, userId, note, noteId: routeNoteId, aiResult
 
 
     async function sendUserMessage({ newMessage }: { newMessage: messageType }) {
+        debugLog("MiddlePanel", "sendUserMessage", { noteId, userId, content: newMessage.content.slice(0, 80) });
         if (!userId || !noteId) {
             showError("Missing user or notebook. Please sign in again.");
             return;
@@ -58,7 +60,8 @@ const MiddlePannel = ({ chatHistory, userId, note, noteId: routeNoteId, aiResult
                 showError("No response from assistant")
             }
         } catch {
-            showError("Failed to send message")
+            dispatch(removeLastChatMessage());
+            showError("Failed to send message");
         } finally {
             setLoading(false)
             setTimeout(scrollToBottom, 100);
@@ -155,7 +158,7 @@ const MiddlePannel = ({ chatHistory, userId, note, noteId: routeNoteId, aiResult
 
 {/* performance optimization */}
                 {chatHistory?.chatHistory?.map((msg, index) => (
-                    <ChatMessage key={index} msg={msg} />
+                    <ChatMessage key={`${index}-${msg.role}-${msg.content.slice(0, 24)}`} msg={msg} />
                 ))}
 
             </div>
@@ -244,17 +247,21 @@ const MiddlePanelHeader = ({ note, docIds, aiResult }: { note: NoteType, docIds:
 
     }
     async function generateMindMap() {
-
-        if (docIds.length > 0) {
-            setMindMapLoading(true)
-            await createMindMap(note?._id, docIds)
-            setMindMapLoading(false)
-            dispatch(fetchNoteSourceResult(note?._id))
-
-        } else {
-            showError("Please select a source");
+        debugLog("MiddlePanel", "generateMindMap clicked", { noteId: note?._id, docIds });
+        if (docIds.length === 0) {
+            showError("Please select at least one source in the left panel");
+            return;
         }
-
+        try {
+            setMindMapLoading(true);
+            await createMindMap(note?._id, docIds);
+            await dispatch(fetchNoteSourceResult(note?._id));
+            showSuccess("Mind map generated — open it from the Studio panel on the right");
+        } catch {
+            showError("Failed to generate mind map");
+        } finally {
+            setMindMapLoading(false);
+        }
     }
 
     async function generateAudio() {
@@ -279,9 +286,20 @@ const MiddlePanelHeader = ({ note, docIds, aiResult }: { note: NoteType, docIds:
 
     return (<div className="mb-3">
         <div>
-            <span style={{ fontSize: "4rem" }}>
-                {note?.image}
-            </span>
+            {note?.image && typeof note.image === "string" && (note.image.startsWith("http") || note.image.startsWith("/")) ? (
+                <img
+                    src={note.image}
+                    alt={note?.title ?? "Notebook thumbnail"}
+                    className="h-28 w-full max-w-sm object-cover rounded-xl shadow-sm"
+                    onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                    }}
+                />
+            ) : (
+                <span style={{ fontSize: "4rem" }}>
+                    {note?.image}
+                </span>
+            )}
 
         </div>
         <div className="mb-4">
