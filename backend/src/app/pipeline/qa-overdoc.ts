@@ -13,19 +13,19 @@ dotenv.config();
 import { queryVectorDB, rerankDocuments } from "./retriever.ts";
 import { reciprocalRankFusion } from "./RRF.ts";
 import { Document } from "@langchain/core/documents";
-import { response_generator_promt } from "./app/pipeline/prompt.js";
+import { response_generator_promt } from "./prompt.ts";
 import {
   extractMessage,
   generateResponseFormatter,
   gradeDocResponseFormater,
   llm,
   TranformResponseFormatter,
-} from "./util/index.ts";
+} from "@/util/index.ts";
 import {
   generate_question_prompt,
   grade_doc_prompt,
   transform_query_prompt,
-} from "./prompts/prompts.ts";
+} from "@/prompts/prompts.ts";
 import { StringOutputParser } from "@langchain/core/output_parsers";
 import { JsonOutputParser } from "@langchain/core/output_parsers";
 import { TavilySearchAPIRetriever } from "@langchain/community/retrievers/tavily_search_api";

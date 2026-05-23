@@ -1,4 +1,4 @@
-import { collapseDocs, splitListOfDocs } from "./util/index.ts";
+import { collapseDocs, splitListOfDocs } from "@/util/index.ts";
 import { Document } from "@langchain/core/documents";
 import { StateGraph, Annotation, Send } from "@langchain/langgraph";
 import { ChatPromptTemplate } from "@langchain/core/prompts";
