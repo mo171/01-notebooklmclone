@@ -33,6 +33,32 @@ export class NotesRepository {
     return Note.find({ userId }).sort({ createdAt: -1 });
   }
 
+  async findByUserPaginated(
+    userId: Types.ObjectId,
+    options: { page?: number; search?: string; limit?: number },
+  ) {
+    const page = Math.max(1, options.page ?? 1);
+    const limit = Math.min(50, Math.max(1, options.limit ?? 12));
+    const search = options.search?.trim() ?? "";
+
+    const filter: Record<string, unknown> = { userId };
+    if (search) {
+      filter.name = { $regex: search, $options: "i" };
+    }
+
+    const [notes, total] = await Promise.all([
+      Note.find(filter)
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit),
+      Note.countDocuments(filter),
+    ]);
+
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+
+    return { notes, total, totalPages, page, limit };
+  }
+
   async findByIdForUser(noteId: Types.ObjectId, userId: Types.ObjectId) {
     return Note.findOne({ _id: noteId, userId });
   }

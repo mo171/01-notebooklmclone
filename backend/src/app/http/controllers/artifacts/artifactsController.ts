@@ -1,102 +1,211 @@
 import { Request, Response, NextFunction } from "express";
-import { NotesRepository } from "@/app/http/controllers/notes/repository/Notesrepository";
+import { Types } from "mongoose";
+import { User } from "@/app/bootstrap/models/userSchema";
+import { Doc } from "@/app/bootstrap/models/docSchema";
 import { generateSummaryPipeline } from "@/app/pipeline/summary";
 import { generateBriefingDocPipeline } from "@/app/pipeline/briefing-doc";
 import { generateFaqPipeline } from "@/app/pipeline/generate-faq";
 import { generateMindMapPipeline } from "@/app/pipeline/mind-map";
 import { generateStudyGuidePipeline } from "@/app/pipeline/study-guide";
-import { Types } from "mongoose";
-import { User } from "@/app/bootstrap/models/userSchema";
 
-export class ArtifactsController {
-  private static async getNoteContent(req: Request, res: Response): Promise<string | null> {
-    const user = req.user as InstanceType<typeof User> | undefined;
-    if (!user) {
-      res.status(401).json({ message: "Unauthorized" });
-      return null;
-    }
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-    const { noteId } = req.params;
-    if (!noteId || !Types.ObjectId.isValid(noteId)) {
-      res.status(400).json({ message: "Invalid note ID" });
-      return null;
-    }
-
-    const note = await NotesRepository.getInstance().findByIdForUser(
-      new Types.ObjectId(noteId),
-      user._id
-    );
-
-    if (!note) {
-      res.status(404).json({ message: "Note not found" });
-      return null;
-    }
-
-    if (!note.description) {
-      res.status(400).json({ message: "Note has no content to process" });
-      return null;
-    }
-
-    return note.description;
+function getUser(req: Request, res: Response): InstanceType<typeof User> | null {
+  const user = req.user as InstanceType<typeof User> | undefined;
+  if (!user) {
+    res.status(401).json({ message: "Unauthorized" });
+    return null;
   }
+  return user;
+}
 
-  static async generateSummary(req: Request, res: Response, next: NextFunction) {
-    try {
-      const content = await ArtifactsController.getNoteContent(req, res);
-      if (!content) return;
+/** Fetch multiple Docs by their IDs, verifying they belong to the user */
+async function getDocContents(
+  docIds: string[],
+  userId: Types.ObjectId
+): Promise<InstanceType<typeof Doc>[]> {
+  const objectIds = docIds
+    .filter((id) => Types.ObjectId.isValid(id))
+    .map((id) => new Types.ObjectId(id));
 
+  return Doc.find({ _id: { $in: objectIds }, userId });
+}
+
+// ── Step-1 Check Endpoints (return ready_to_generate_source) ──────────────────
+// These match what the frontend expects first before calling the generate+save routes.
+
+/** POST /api/v1/notes/summary */
+export async function checkSummaryReady(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getUser(req, res);
+    if (!user) return;
+    return res.json({ status: "ready_to_generate_source" });
+  } catch (err) { next(err); }
+}
+
+/** POST /api/v1/notes/faq */
+export async function checkFaqReady(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getUser(req, res);
+    if (!user) return;
+    return res.json({ status: "ready_to_generate_source" });
+  } catch (err) { next(err); }
+}
+
+/** POST /api/v1/notes/studyguide */
+export async function checkStudyGuideReady(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getUser(req, res);
+    if (!user) return;
+    return res.json({ status: "ready_to_generate_source" });
+  } catch (err) { next(err); }
+}
+
+/** POST /api/v1/notes/briefingdoc */
+export async function checkBriefingDocReady(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getUser(req, res);
+    if (!user) return;
+    return res.json({ status: "ready_to_generate_source" });
+  } catch (err) { next(err); }
+}
+
+/** POST /api/v1/notes/mindmap */
+export async function checkMindMapReady(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getUser(req, res);
+    if (!user) return;
+    return res.json({ status: "ready_to_generate_source" });
+  } catch (err) { next(err); }
+}
+
+// ── Step-2 Generate+Save Endpoints ───────────────────────────────────────────
+
+/** POST /api/v1/notes/add/sources — generate summary for selected docs */
+export async function saveSummaryToSources(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getUser(req, res);
+    if (!user) return;
+
+    const { noteId, docIds } = req.body as { noteId?: string; docIds?: string[] };
+    if (!noteId || !docIds?.length) {
+      return res.status(400).json({ message: "noteId and docIds are required" });
+    }
+
+    const docs = await getDocContents(docIds, user._id);
+    if (!docs.length) return res.status(404).json({ message: "No matching docs found" });
+
+    // Run pipeline on combined content, update each doc
+    for (const doc of docs) {
+      const content = doc.description ?? "";
+      if (!content) continue;
       const summary = await generateSummaryPipeline(content);
-      return res.json({ summary });
-    } catch (error) {
-      next(error);
+      await Doc.findByIdAndUpdate(doc._id, { summary });
     }
-  }
 
-  static async generateBriefingDoc(req: Request, res: Response, next: NextFunction) {
-    try {
-      const content = await ArtifactsController.getNoteContent(req, res);
-      if (!content) return;
+    return res.json({ message: "Summary generated and saved successfully" });
+  } catch (err) { next(err); }
+}
 
-      const briefingDoc = await generateBriefingDocPipeline(content);
-      return res.json({ briefingDoc });
-    } catch (error) {
-      next(error);
+/** POST /api/v1/notes/add/faq/sources — generate FAQ for selected docs */
+export async function saveFaqToSources(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getUser(req, res);
+    if (!user) return;
+
+    const { noteId, docIds } = req.body as { noteId?: string; docIds?: string[] };
+    if (!noteId || !docIds?.length) {
+      return res.status(400).json({ message: "noteId and docIds are required" });
     }
-  }
 
-  static async generateFaq(req: Request, res: Response, next: NextFunction) {
-    try {
-      const content = await ArtifactsController.getNoteContent(req, res);
-      if (!content) return;
+    const docs = await getDocContents(docIds, user._id);
+    if (!docs.length) return res.status(404).json({ message: "No matching docs found" });
 
+    for (const doc of docs) {
+      const content = doc.description ?? "";
+      if (!content) continue;
       const faq = await generateFaqPipeline(content);
-      return res.json({ faq });
-    } catch (error) {
-      next(error);
+      await Doc.findByIdAndUpdate(doc._id, { FAQ: faq });
     }
-  }
 
-  static async generateMindMap(req: Request, res: Response, next: NextFunction) {
-    try {
-      const content = await ArtifactsController.getNoteContent(req, res);
-      if (!content) return;
+    return res.json({ message: "FAQ generated and saved successfully" });
+  } catch (err) { next(err); }
+}
 
-      const mindMapData = await generateMindMapPipeline(content);
-      return res.json({ mindMap: mindMapData });
-    } catch (error) {
-      next(error);
+/** POST /api/v1/notes/add/studyguide/sources — generate study guide for selected docs */
+export async function saveStudyGuideToSources(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getUser(req, res);
+    if (!user) return;
+
+    const { noteId, docIds } = req.body as { noteId?: string; docIds?: string[] };
+    if (!noteId || !docIds?.length) {
+      return res.status(400).json({ message: "noteId and docIds are required" });
     }
-  }
 
-  static async generateStudyGuide(req: Request, res: Response, next: NextFunction) {
-    try {
-      const content = await ArtifactsController.getNoteContent(req, res);
-      if (!content) return;
+    const docs = await getDocContents(docIds, user._id);
+    if (!docs.length) return res.status(404).json({ message: "No matching docs found" });
 
+    for (const doc of docs) {
+      const content = doc.description ?? "";
+      if (!content) continue;
       const studyGuide = await generateStudyGuidePipeline(content);
-      return res.json({ studyGuide });
-    } catch (error) {
-      next(error);
+      await Doc.findByIdAndUpdate(doc._id, { studyGuide });
     }
-  }
+
+    return res.json({ message: "Study guide generated and saved successfully" });
+  } catch (err) { next(err); }
+}
+
+/** POST /api/v1/notes/add/briefingdoc/sources — generate briefing doc for selected docs */
+export async function saveBriefingDocToSources(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getUser(req, res);
+    if (!user) return;
+
+    const { noteId, docIds } = req.body as { noteId?: string; docIds?: string[] };
+    if (!noteId || !docIds?.length) {
+      return res.status(400).json({ message: "noteId and docIds are required" });
+    }
+
+    const docs = await getDocContents(docIds, user._id);
+    if (!docs.length) return res.status(404).json({ message: "No matching docs found" });
+
+    for (const doc of docs) {
+      const content = doc.description ?? "";
+      if (!content) continue;
+      const briefingDoc = await generateBriefingDocPipeline(content);
+      await Doc.findByIdAndUpdate(doc._id, { briefingDoc });
+    }
+
+    return res.json({ message: "Briefing doc generated and saved successfully" });
+  } catch (err) { next(err); }
+}
+
+/** POST /api/v1/notes/add/mindmap/sources — generate mind map for selected docs */
+export async function saveMindMapToSources(req: Request, res: Response, next: NextFunction) {
+  try {
+    const user = getUser(req, res);
+    if (!user) return;
+
+    const { noteId, docIds } = req.body as { noteId?: string; docIds?: string[] };
+    if (!noteId || !docIds?.length) {
+      return res.status(400).json({ message: "noteId and docIds are required" });
+    }
+
+    const docs = await getDocContents(docIds, user._id);
+    if (!docs.length) return res.status(404).json({ message: "No matching docs found" });
+
+    for (const doc of docs) {
+      const content = doc.description ?? "";
+      if (!content) continue;
+      const mindMap = await generateMindMapPipeline(content);
+      // Store mind map JSON as string
+      await Doc.findByIdAndUpdate(doc._id, {
+        mindMap: typeof mindMap === "string" ? mindMap : JSON.stringify(mindMap),
+      });
+    }
+
+    return res.json({ message: "Mind map generated and saved successfully" });
+  } catch (err) { next(err); }
 }

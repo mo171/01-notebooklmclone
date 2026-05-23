@@ -2,9 +2,7 @@ import { Express, NextFunction, Request, Response } from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { GoogleDriveService } from "@/app/services/notes/drive";
-import { URLNoteService } from "@/app/services/notes/url";
-import { UploadNoteService } from "@/app/services/notes/upload";
+import { loadNoteSource } from "@/app/services/notes/loader";
 import { generateImage } from "@/app/services/notes/generateImage";
 import { NotesRepository } from "./Notesrepository";
 import { User } from "@/app/bootstrap/models/userSchema";
@@ -56,13 +54,6 @@ export async function createNote(
 
     let sourceType: "drive" | "url" | "upload";
     let sourceRef: string | undefined;
-    let jobSource: {
-      type: "drive" | "url" | "upload";
-      driveFileId?: string;
-      url?: string;
-      uploadPath?: string;
-      originalName?: string;
-    };
 
     if (driveFileId) {
       if (!user.googleAccessToken) {
@@ -72,15 +63,12 @@ export async function createNote(
       }
       sourceType = "drive";
       sourceRef = driveFileId;
-      jobSource = { type: "drive", driveFileId };
     } else if (url) {
       sourceType = "url";
       sourceRef = url;
-      jobSource = { type: "url", url };
     } else if (file) {
       sourceType = "upload";
       sourceRef = file.originalname;
-      jobSource = { type: "upload", uploadPath: file.path, originalName: file.originalname };
     } else {
       return res.status(400).json({ message: "No valid source provided" });
     }
@@ -98,27 +86,18 @@ export async function createNote(
     let noteName: string;
 
     try {
-      switch (sourceType) {
-        case "drive": {
-          const driveService = GoogleDriveService.getInstance();
-          content = await driveService.readFileFromDrive(driveFileId!);
-          noteName = `Note from Drive: ${driveFileId}`;
-          break;
-        }
-        case "url": {
-          const urlService = URLNoteService.getInstance();
-          content = await urlService.readContentFromUrl(url!);
-          noteName = `Note from URL: ${url!.length > 50 ? url!.slice(0, 50) + "..." : url}`;
-          break;
-        }
-        case "upload": {
-          const uploadService = new UploadNoteService();
-          content = await uploadService.readContentFromUpload(file!);
-          noteName = `Note from File: ${file!.originalname}`;
-          break;
-        }
-        default:
-          throw new Error(`Unsupported source type`);
+      if (sourceType === "drive") {
+        const result = await loadNoteSource({ type: "drive", driveFileId: driveFileId!, user });
+        content = result.fullText;
+        noteName = `Note from Drive: ${driveFileId}`;
+      } else if (sourceType === "url") {
+        const result = await loadNoteSource({ type: "url", url: url! });
+        content = result.fullText;
+        noteName = `Note from URL: ${url!.length > 50 ? url!.slice(0, 50) + "..." : url}`;
+      } else {
+        const result = await loadNoteSource({ type: "upload", uploadPath: file!.path });
+        content = result.fullText;
+        noteName = `Note from File: ${file!.originalname}`;
       }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -161,3 +140,4 @@ export async function createNote(
     next(err);
   }
 }
+

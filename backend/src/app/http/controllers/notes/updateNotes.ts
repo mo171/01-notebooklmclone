@@ -19,7 +19,7 @@ export async function updateNotes(
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    const noteIdParam = req.params.noteId;
+    const noteIdParam = req.params.noteId || req.body.id;
     const noteId = Array.isArray(noteIdParam) ? noteIdParam[0] : noteIdParam;
 
     if (!noteId || !Types.ObjectId.isValid(noteId)) {
@@ -36,12 +36,12 @@ export async function updateNotes(
       return res.status(404).json({ message: "Note not found" });
     }
 
-    const { name } = req.body as { name?: unknown };
+    const name = req.body.name || req.body.title;
 
     if (typeof name !== "string" || !name.trim()) {
       return res
         .status(400)
-        .json({ message: "A non-empty 'name' string is required" });
+        .json({ message: "A non-empty 'name' or 'title' string is required" });
     }
 
     const updated = await Note.findByIdAndUpdate(
@@ -50,7 +50,7 @@ export async function updateNotes(
       { new: true },
     );
 
-    return res.json({ note: updated });
+    return res.json({ note: updated, message: "Note updated successfully" });
   } catch (err) {
     next(err);
   }

@@ -10,22 +10,22 @@ import { z } from "zod";
 import { ChatMistralAI } from "@langchain/mistralai";
 import dotenv from "dotenv";
 dotenv.config();
-import { queryVectorDB, rerankDocuments } from "./retriever.ts";
-import { reciprocalRankFusion } from "./RRF.ts";
+import { queryVectorDB, rerankDocuments } from "./retriever";
+import { reciprocalRankFusion } from "./RRF";
 import { Document } from "@langchain/core/documents";
-import { response_generator_promt } from "./prompt.ts";
+import { response_generator_promt } from "@/prompts/prompts";
 import {
   extractMessage,
   generateResponseFormatter,
   gradeDocResponseFormater,
   llm,
   TranformResponseFormatter,
-} from "@/util/index.ts";
+} from "@/util/index";
 import {
   generate_question_prompt,
   grade_doc_prompt,
   transform_query_prompt,
-} from "@/prompts/prompts.ts";
+} from "@/prompts/prompts";
 import { StringOutputParser } from "@langchain/core/output_parsers";
 import { JsonOutputParser } from "@langchain/core/output_parsers";
 import { TavilySearchAPIRetriever } from "@langchain/community/retrievers/tavily_search_api";
@@ -41,7 +41,7 @@ const StateAnnotation = Annotation.Root({
   newQuery: Annotation<string>({
     reducer: (previousVal, nextVal) => previousVal ?? nextVal ?? "",
   }),
-  retrievedDoc: Annotation<string[]>({
+  retrievedDoc: Annotation<Document[]>({
     default: () => [],
     reducer: (previousVal, nextVal) => previousVal.concat(nextVal),
   }),
@@ -51,7 +51,7 @@ const StateAnnotation = Annotation.Root({
     reducer: (previousVal, nextVal) => previousVal.concat(nextVal),
   }),
 
-  filteredDoc: Annotation<string[]>({
+  filteredDoc: Annotation<Document[]>({
     default: () => [],
     reducer: (previousVal, nextVal) => previousVal.concat(nextVal),
   }),

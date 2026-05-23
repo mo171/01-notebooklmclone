@@ -34,7 +34,16 @@ export async function getNoteById(
       return res.status(404).json({ message: "Note not found" });
     }
 
-    return res.json({ note });
+    const formatted = {
+      _id: note._id,
+      title: note.name,
+      image: note.image ?? "",
+      userId: note.userId,
+      createdAt: note.createdAt,
+      docs: [] as unknown[],
+    };
+
+    return res.json({ note: formatted });
   } catch (err) {
     next(err);
   }

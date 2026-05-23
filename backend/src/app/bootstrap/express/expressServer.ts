@@ -145,7 +145,7 @@ export function ExpressServer(app: Express, PORT: number) {
     (req: Request, res: Response) => {
       const authData = req.user as unknown as Express.User;
 
-      const redirectUrl = new URL(frontendUrl);
+      const redirectUrl = new URL(`${frontendUrl}/auth/callback`);
       redirectUrl.searchParams.set("accessToken", authData.token.accessToken);
       redirectUrl.searchParams.set("refreshToken", authData.token.refreshToken);
       res.redirect(redirectUrl.toString());

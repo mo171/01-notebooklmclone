@@ -1,4 +1,4 @@
-import { collapseDocs, splitListOfDocs } from "@/util/index.ts";
+import { collapseDocs } from "@/util/index";
 import { Document } from "@langchain/core/documents";
 import { StateGraph, Annotation, Send } from "@langchain/langgraph";
 import { ChatPromptTemplate } from "@langchain/core/prompts";
@@ -32,6 +32,38 @@ async function lengthFunction(documents: Document[]) {
     approximateTokens(doc.pageContent),
   );
   return tokenCounts.reduce((sum, count) => sum + count, 0);
+}
+
+async function splitListOfDocs(
+	documents: Document[],
+	lengthFn: (docs: Document[]) => Promise<number>,
+	maxTokens: number,
+): Promise<Document[][]> {
+	if (documents.length === 0) return [];
+
+	const result: Document[][] = [];
+	let current: Document[] = [];
+
+	for (const doc of documents) {
+		if (current.length === 0) {
+			current = [doc];
+			continue;
+		}
+
+		const nextCandidate = current.concat([doc]);
+		const candidateLength = await lengthFn(nextCandidate);
+
+		if (candidateLength > maxTokens) {
+			result.push(current);
+			current = [doc];
+			continue;
+		}
+
+		current = nextCandidate;
+	}
+
+	if (current.length > 0) result.push(current);
+	return result;
 }
 
 // ── State definitions ────────────────────────────────────────────────────────
@@ -102,9 +134,9 @@ const shouldCollapse = (state: typeof OverallState.State) => {
 
 // If the total token count exceeds the max, we collapse the summaries
 const collapseSummaries = async (state: typeof OverallState.State) => {
-  const docLists = splitListOfDocs(
+  const docLists = await splitListOfDocs(
     state.collapsedSummaries,
-    await lengthFunction,
+    lengthFunction,
     tokenMax,
   );
   const results: Document[] = [];

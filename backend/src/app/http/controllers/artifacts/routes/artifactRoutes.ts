@@ -1,13 +1,21 @@
 import { Router } from "express";
 import { requireAuth } from "@/app/helpers/jwt";
-import { ArtifactsController } from "../artifactsController";
+import * as ArtifactsController from "../artifactsController";
 
 export function artifactRoutes(router: Router) {
-  router.post("/notes/:noteId/summary", requireAuth, ArtifactsController.generateSummary);
-  router.post("/notes/:noteId/briefing-doc", requireAuth, ArtifactsController.generateBriefingDoc);
-  router.post("/notes/:noteId/faq", requireAuth, ArtifactsController.generateFaq);
-  router.post("/notes/:noteId/mind-map", requireAuth, ArtifactsController.generateMindMap);
-  router.post("/notes/:noteId/study-guide", requireAuth, ArtifactsController.generateStudyGuide);
+  // ── Step 1: Check Ready Endpoints ──
+  router.post("/notes/summary", requireAuth, ArtifactsController.checkSummaryReady);
+  router.post("/notes/faq", requireAuth, ArtifactsController.checkFaqReady);
+  router.post("/notes/studyguide", requireAuth, ArtifactsController.checkStudyGuideReady);
+  router.post("/notes/briefingdoc", requireAuth, ArtifactsController.checkBriefingDocReady);
+  router.post("/notes/mindmap", requireAuth, ArtifactsController.checkMindMapReady);
+
+  // ── Step 2: Generate & Save Endpoints ──
+  router.post("/notes/add/sources", requireAuth, ArtifactsController.saveSummaryToSources);
+  router.post("/notes/add/faq/sources", requireAuth, ArtifactsController.saveFaqToSources);
+  router.post("/notes/add/studyguide/sources", requireAuth, ArtifactsController.saveStudyGuideToSources);
+  router.post("/notes/add/briefingdoc/sources", requireAuth, ArtifactsController.saveBriefingDocToSources);
+  router.post("/notes/add/mindmap/sources", requireAuth, ArtifactsController.saveMindMapToSources);
 
   return router;
 }
