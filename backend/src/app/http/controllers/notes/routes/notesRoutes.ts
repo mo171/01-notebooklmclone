@@ -21,6 +21,12 @@ export function notesRoutes(router: Router) {
   router.post("/notes/weblinkdata", requireAuth, DocsController.importWebLink);
   router.post("/notes/text-data", requireAuth, DocsController.importTextData);
   router.post("/notes/youtube-link", requireAuth, DocsController.importYoutubeLink);
+  router.post(
+    "/notes/upload-files",
+    requireAuth,
+    DocsController.uploadFilesMiddleware,
+    DocsController.uploadFilesToNote,
+  );
 
   router.put("/notes", requireAuth, updateNotes);
   router.patch("/notes/:noteId", requireAuth, updateNotes);

@@ -1,11 +1,16 @@
-import { logoutUser } from "@/api/auth";
 import UserAvatar from "@/components/base/UserAvatar";
-import { getUserData } from "@/helper/getUserData";
-import React, { useState, useRef, useEffect } from "react";
-import { Link, Outlet } from "react-router";
+import { useEffect } from "react";
+import { Link, Outlet, useNavigate } from "react-router";
+import { ToastContainer } from "react-toastify";
 
 export default function NoteLayout() {
- 
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!localStorage.getItem("accessToken")) {
+      navigate("/auth/login");
+    }
+  }, [navigate]);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -26,6 +31,7 @@ export default function NoteLayout() {
       <main className="flex-1 p-6 ">
         <Outlet />
       </main>
+      <ToastContainer />
     </div>
   );
 }

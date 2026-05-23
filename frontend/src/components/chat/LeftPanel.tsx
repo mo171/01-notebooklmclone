@@ -135,7 +135,7 @@ const LeftPanel = ({ note, loading }: LeftPanelProps) => {
                     className="flex items-center gap-2 hover:bg-gray-50 p-2 rounded-md"
                   >
                     <SourceIcon type={doc?.source_type} />
-                    <span className="flex-1 text-base text-gray-600 truncate"> {doc?.title}  </span>
+                    <span className="flex-1 text-base text-gray-600 truncate"> {doc?.title ?? doc?.fileName ?? "Untitled"}  </span>
                     <Checkbox
                       className="cursor-pointer"
                       checked={selectedDocs.includes(doc._id)}

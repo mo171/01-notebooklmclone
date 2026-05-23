@@ -25,79 +25,50 @@ export async function getSingleNote(id: string): Promise<{ note: NoteType }> {
 
 
 const downloadFileInDrive = async (fileId: string, noteId?: string) => {
-    try {
-        const userData = getUserData()
-        const userId = userData?._id
+    const userData = getUserData()
+    const userId = userData?._id
 
-        const data = await makeHttpReq('POST', `notes/drive-files`,
-            { fileId, userId, noteId }) as NoteServerData
-        console.log(data)
-
-    } catch (error) {
-        console.log('error : ', error)
-    }
-
+    return makeHttpReq('POST', `notes/drive-files`, { fileId, userId, noteId })
 };
 
 
-export const uploadPickedFiles = async (docs: any[], noteId: string) => {
-    if (Array.isArray(docs)) {
+export const uploadPickedFiles = async (docs: any[], noteId?: string) => {
+    if (!noteId || !Array.isArray(docs) || docs.length === 0) {
+        return
+    }
 
-        for (const doc of docs) {
-            await downloadFileInDrive(doc.id, noteId);
-
-        }
-
+    for (const doc of docs) {
+        await downloadFileInDrive(doc.id, noteId)
     }
 };
 
 
 export const sendWeblink = async (webLink: string, noteId?: string) => {
-    try {
-        const userData = getUserData()
-        const userId = userData?._id
+    const userData = getUserData()
+    const userId = userData?._id
 
-        const data = await makeHttpReq('POST', `notes/weblinkdata`,
-            { webLink, userId, noteId })
-        console.log('add weblink : ', data)
-
-    } catch (error) {
-        console.log('error : ', error)
-    }
-
+    const data = await makeHttpReq('POST', `notes/weblinkdata`,
+        { webLink, userId, noteId })
+    return data
 };
 
 
 export const sendTextData = async (text: string, noteId?: string) => {
-    try {
-        const userData = getUserData()
-        const userId = userData?._id
+    const userData = getUserData()
+    const userId = userData?._id
 
-        const data = await makeHttpReq('POST', `notes/text-data`,
-            { text, userId, noteId })
-        console.log('add text : ', data)
-
-    } catch (error) {
-        console.log('error : ', error)
-    }
-
+    const data = await makeHttpReq('POST', `notes/text-data`,
+        { text, userId, noteId })
+    return data
 };
 
 
 
 export const sendYoutubeLink = async (youtubeLink: string, noteId?: string) => {
-    try {
-        const userData = getUserData()
-        const userId = userData?._id
+    const userData = getUserData()
+    const userId = userData?._id
 
-        const data = await makeHttpReq('POST', `notes/youtube-link`,
-            { youtubeLink, userId, noteId })
-        console.log('add text : ', data)
-
-    } catch (error) {
-        console.log('error : ', error)
-    }
-
+    return makeHttpReq('POST', `notes/youtube-link`, { youtubeLink, userId, noteId })
 };
 
 
@@ -361,46 +332,27 @@ export const getNoteChats = async (userId: string, noteId: string) => {
 
 
 export const sendChatMessage = async ({userId,noteId,query}:{userId: string, noteId: string,query:string}) => {
-    try {
-
-        const data = await makeHttpReq('POST', `chats`,
-            { userId, noteId,query }) as {message:messageType}
-            return data
-    } catch (error) {
-        console.log('error : ', error)
-    }
-
+    const data = await makeHttpReq('POST', `chats`,
+        { userId, noteId, query }) as { message: messageType }
+    return data
 }
 
 export type questionAndDocOverviewType= {aiResult:{questions:string[],doc_overview:string}}
 
-export const getQuestionsAndDocOverview = async (noteId:string) => {
-    try {
-
-        const data = await makeHttpReq('GET', `notes/docs/overview?noteId=${noteId}`) as questionAndDocOverviewType
-        console.log(' :  ',data)
-            return data
-    } catch (error) {
-        console.log('error : ', error)
-    }
-
+export const getQuestionsAndDocOverview = async (noteId: string) => {
+    const data = await makeHttpReq('GET', `notes/docs/overview?noteId=${noteId}`) as questionAndDocOverviewType
+    return data ?? { aiResult: { questions: [], doc_overview: "" } }
 }
 
 
 
 export const createBlankNote = async () => {
-    try {
-        const userData = getUserData()
-        const userId = userData?._id
+    const userData = getUserData()
+    const userId = userData?._id
 
-        const data = await makeHttpReq('POST', `blank/notes`,
-            { userId }) as{newNote: {_id:string,title:string}}
-       return data
-
-    } catch (error) {
-        console.log('error : ', error)
-    }
-
+    return makeHttpReq('POST', `blank/notes`, { userId }) as Promise<{
+        newNote: { _id: string; title: string }
+    }>
 };
 
 

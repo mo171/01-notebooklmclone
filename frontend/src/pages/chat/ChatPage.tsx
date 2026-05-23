@@ -74,7 +74,7 @@ function ChatPage() {
       <div className="flex h-screen gap-2">
 
         <LeftPanel loading={loading} note={note} />
-        <MiddlePanel aiResult={aiResult} chatHistory={chatHistory} note={note} userId={userData?._id}></MiddlePanel>
+        <MiddlePanel aiResult={aiResult} chatHistory={chatHistory} note={note} noteId={id} userId={userData?._id ?? ""}></MiddlePanel>
         <RightPanel noteId={id}/>
 
         <CreateNoteModal noteId={id} ></CreateNoteModal>

@@ -12,6 +12,8 @@ import { sendWeblink } from "@/api/notes";
 import { useDispatch, useSelector } from "react-redux";
 import type { AppDispatch } from "@/store";
 import { fetchSingleNote } from "@/store/chatSlice";
+import { fetchNoteSourceResult } from "@/store/rightPanelSlice";
+import { showError, showSuccess } from "@/util/toast-notification";
 // 1. Schema validation with Zod
 const formSchema = z.object({
     weblink: z
@@ -37,13 +39,21 @@ const AddWebLinkForm = ({ hideWebLinkForm,noteId }: { hideWebLinkForm: () => voi
 
     // 3. Submission handler
     const onSubmit = async (data: FormValues) => {
+        if (!noteId) {
+            showError("Open a notebook before adding a link");
+            return;
+        }
 
-      await  sendWeblink(data?.weblink,noteId)
-       dispatch(fetchSingleNote(noteId as string))
-
-        // Reset form after submit
-        reset();
-        // hideWebLinkForm();
+        try {
+            await sendWeblink(data.weblink, noteId);
+            await dispatch(fetchSingleNote(noteId));
+            dispatch(fetchNoteSourceResult(noteId));
+            showSuccess("Website source added");
+            reset();
+            hideWebLinkForm();
+        } catch {
+            showError("Failed to add website link");
+        }
     };
 
     return (

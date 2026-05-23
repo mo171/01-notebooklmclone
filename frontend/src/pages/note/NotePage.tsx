@@ -22,6 +22,7 @@ import { toggleAddSourceNoteModal } from '@/store/addSourceSlice';
 import { useNavigate } from 'react-router';
 import { createBlankNote } from '@/api/notes';
 import { attribNoteVal } from '@/store/chatSlice';
+import { showError } from '@/util/toast-notification';
 
 function NotePage() {
     // const [count, setCount] = useState(0)
@@ -62,20 +63,27 @@ function NotePage() {
 
 
     const showAddNoteSourceModal = async () => {
-
         try {
             setCreateNoteLoading(true)
             const data = await createBlankNote()
+
+            if (!data?.newNote?._id) {
+                showError("Failed to create notebook")
+                return
+            }
+
+            dispatch(attribNoteVal(data.newNote))
             dispatch(toggleAddSourceNoteModal())
-            dispatch(attribNoteVal(data?.newNote))
-
-            navigate('/chats/' + data?.newNote?._id)
+            navigate('/chats/' + data.newNote._id)
+        } catch (error: unknown) {
+            const message =
+                error && typeof error === "object" && "message" in error
+                    ? String((error as { message: string }).message)
+                    : "Failed to create notebook"
+            showError(message)
+        } finally {
             setCreateNoteLoading(false)
-        } catch (error) {
-            setCreateNoteLoading(false)
-
         }
-
     }
 
 

@@ -1,5 +1,8 @@
 import { Request, Response, NextFunction } from "express";
 import { Types } from "mongoose";
+import path from "path";
+import fs from "fs/promises";
+import multer from "multer";
 import { User } from "@/app/bootstrap/models/userSchema";
 import { Note } from "@/app/bootstrap/models/notesScchema";
 import { Doc } from "@/app/bootstrap/models/docSchema";
@@ -7,6 +10,22 @@ import { loadNoteSource } from "@/app/services/notes/loader";
 import { ingestTextToPinecone } from "@/app/pipeline/ingestion-pipeline";
 import { generateTitle } from "@/app/services/notes/Titlegeneration";
 import { TavilySearchAPIRetriever } from "@langchain/community/retrievers/tavily_search_api";
+
+const uploadDir = path.join(process.cwd(), "tmp", "uploads");
+fs.mkdir(uploadDir, { recursive: true }).catch(() => undefined);
+
+const multerUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, uploadDir),
+    filename: (_req, file, cb) => {
+      const unique = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      cb(null, `${unique}${path.extname(file.originalname)}`);
+    },
+  }),
+  limits: { fileSize: 20 * 1024 * 1024 },
+});
+
+export const uploadFilesMiddleware = multerUpload.array("doc", 20);
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -37,7 +56,9 @@ async function createDocFromContent(
     noteId: noteId.toString(),
     userId: userId.toString(),
     docId: doc._id.toString(),
-  }).catch((err) => console.error("[docsController] Pinecone ingest failed:", err));
+  }).catch((err) =>
+    console.error("[docsController] Pinecone ingest failed:", err),
+  );
 
   return doc;
 }
@@ -159,6 +180,64 @@ export async function importYoutubeLink(req: Request, res: Response, next: NextF
     const doc = await createDocFromContent(new Types.ObjectId(noteId), user._id, title, fullText);
 
     return res.status(201).json({ doc });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** POST /api/v1/notes/upload-files — upload local file(s) into an existing note */
+export async function uploadFilesToNote(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const user = getUser(req, res);
+    if (!user) return;
+
+    const { noteId } = req.body as { noteId?: string };
+    const files = req.files as Express.Multer.File[] | undefined;
+
+    if (!noteId || !Types.ObjectId.isValid(noteId)) {
+      return res.status(400).json({ message: "Valid noteId is required" });
+    }
+    if (!files?.length) {
+      return res.status(400).json({ message: "At least one file is required" });
+    }
+
+    const note = await Note.findOne({ _id: noteId, userId: user._id });
+    if (!note) {
+      return res.status(404).json({ message: "Note not found" });
+    }
+
+    const createdDocs = [];
+
+    for (const file of files) {
+      try {
+        const { fullText } = await loadNoteSource({
+          type: "upload",
+          uploadPath: file.path,
+          originalName: file.originalname,
+        });
+        const title = await generateTitle(fullText).catch(
+          () => file.originalname,
+        );
+        const doc = await createDocFromContent(
+          new Types.ObjectId(noteId),
+          user._id,
+          title,
+          fullText,
+        );
+        createdDocs.push(doc);
+      } finally {
+        await fs.unlink(file.path).catch(() => undefined);
+      }
+    }
+
+    return res.status(201).json({
+      message: "Files uploaded successfully",
+      docs: createdDocs,
+    });
   } catch (err) {
     next(err);
   }

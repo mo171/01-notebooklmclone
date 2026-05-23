@@ -1,42 +1,37 @@
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
-import { CheerioWebBaseLoader } from "@langchain/community/document_loaders/web/cheerio";
-import { PineconeStore } from "@langchain/pinecone";
-import { Pinecone as PineconeClient } from "@pinecone-database/pinecone";
-import { HuggingFaceTransformersEmbeddings } from "@langchain/community/embeddings/huggingface_transformers";
+import { upsertDocuments, isPineconeConfigured } from "@/app/services/pinecone/pineconeVector";
 import "dotenv/config";
 
+export async function ingestTextToPinecone(
+  text: string,
+  metadata: Record<string, string> = {},
+) {
+  if (!isPineconeConfigured()) {
+    console.warn("[ingestion] Pinecone not configured — skipping vector ingest");
+    return;
+  }
 
-
-export async function ingestTextToPinecone(text: string, metadata: Record<string, any> = {}) {
-  // Replace large empty spaces
   const cleanedText = text.replace(/\s+/g, " ").trim();
+  if (!cleanedText) {
+    return;
+  }
 
-  // chunkoverlap: we use it in order to preverse the meaning of the chunk
   const textSplitter = new RecursiveCharacterTextSplitter({
     chunkSize: 500,
     chunkOverlap: 200,
   });
 
-  const docs = await textSplitter.createDocuments([cleanedText], [metadata]);
-  const allSplits = await textSplitter.splitDocuments(docs);
+  const splits = await textSplitter.createDocuments([cleanedText], [metadata]);
+  if (splits.length === 0) {
+    return;
+  }
 
-  const embeddings = new HuggingFaceTransformersEmbeddings({
-    // apiKey: process.env.HUGGINGFACE_API_KEY as string,
-    model: "BAAI/bge-small-en-v1.5", // popular & free model
-  });
-  
-  const pinecone = new PineconeClient({
-    apiKey: process.env.PINECONE_API_KEY as string,
-  });
-  const pineconeIndex = pinecone.Index(process.env.PINECONE_INDEX as string);
-  
-  const vectorStore = new PineconeStore(embeddings, {
-    pineconeIndex,
-    maxConcurrency: 5,
-  });
+  await upsertDocuments(
+    splits.map((doc) => ({
+      pageContent: doc.pageContent,
+      metadata: doc.metadata as Record<string, unknown>,
+    })),
+  );
 
-  await vectorStore.addDocuments(allSplits);
-  console.log('finished indexing...')
-
-  
+  console.log(`[ingestion] Indexed ${splits.length} chunk(s) to Pinecone`);
 }

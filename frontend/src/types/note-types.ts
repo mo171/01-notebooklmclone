@@ -17,9 +17,10 @@ export type NoteType = {
 
 export type DocType = {
     _id: string,
-    fileName: string,
+    title?: string,
+    fileName?: string,
     noteId: string,
-    userId:string,
-    source_type:string
+    userId: string,
+    source_type: string
 }
 export type NoteServerData = { notes: NoteType[] } & { pagination?: PaginationType }

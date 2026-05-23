@@ -101,8 +101,10 @@ const chatSlice = createSlice({
         state.loading = true;
         state.error = null;
       })
-      .addCase(fetchDocOverviewAndQuestions.fulfilled, (state, action: PayloadAction<questionAndDocOverviewType >) => {
-        state.aiResult = action.payload;
+      .addCase(fetchDocOverviewAndQuestions.fulfilled, (state, action) => {
+        state.aiResult = action.payload ?? {
+          aiResult: { questions: [], doc_overview: "" },
+        };
         state.loading = false;
       })
       .addCase(fetchDocOverviewAndQuestions.rejected, (state, action) => {

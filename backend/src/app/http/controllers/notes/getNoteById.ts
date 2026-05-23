@@ -1,7 +1,17 @@
 import { NextFunction, Request, Response } from "express";
 import { Types } from "mongoose";
 import { User } from "@/app/bootstrap/models/userSchema";
+import { Doc } from "@/app/bootstrap/models/docSchema";
 import { NotesRepository } from "./repository/Notesrepository";
+
+function inferSourceType(doc: InstanceType<typeof Doc>) {
+  if (doc.mindMap) return "mindMap";
+  if (doc.briefingDoc) return "audio";
+  if (doc.summary) return "summary";
+  if (doc.FAQ) return "faq";
+  if (doc.studyGuide) return "studyguide";
+  return "doc";
+}
 
 /**
  * GET /api/v1/notes/:noteId
@@ -34,13 +44,27 @@ export async function getNoteById(
       return res.status(404).json({ message: "Note not found" });
     }
 
+    const docs = await Doc.find({
+      noteId: new Types.ObjectId(noteId),
+      userId: user._id,
+    }).sort({ createdAt: -1 });
+
+    const formattedDocs = docs.map((doc) => ({
+      _id: doc._id,
+      title: doc.title,
+      fileName: doc.title,
+      noteId: doc.noteId,
+      userId: doc.userId,
+      source_type: inferSourceType(doc),
+    }));
+
     const formatted = {
       _id: note._id,
       title: note.name,
       image: note.image ?? "",
       userId: note.userId,
       createdAt: note.createdAt,
-      docs: [] as unknown[],
+      docs: formattedDocs,
     };
 
     return res.json({ note: formatted });

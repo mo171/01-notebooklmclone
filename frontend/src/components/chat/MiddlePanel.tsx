@@ -16,8 +16,14 @@ import { SuggestedInput } from "./SuggestedInput";
 import { ChatInput } from "./ChatInput";
 
 
-const MiddlePannel = ({ chatHistory, userId, note, aiResult }: { chatHistory: chatHistoryType, userId: string, note: NoteType, aiResult: questionAndDocOverviewType }) => {
-    const { _id: noteId } = note
+const MiddlePannel = ({ chatHistory, userId, note, noteId: routeNoteId, aiResult }: {
+    chatHistory: chatHistoryType,
+    userId: string,
+    note: NoteType,
+    noteId?: string,
+    aiResult: questionAndDocOverviewType
+}) => {
+    const noteId = note?._id ?? routeNoteId ?? ""
     const dispatch = useDispatch<AppDispatch>();
     const { middlePanelDefaultWidth } = useSelector((state: RootState) => state.chat);
 
@@ -32,28 +38,47 @@ const MiddlePannel = ({ chatHistory, userId, note, aiResult }: { chatHistory: ch
 
 
     async function sendUserMessage({ newMessage }: { newMessage: messageType }) {
+        if (!userId || !noteId) {
+            showError("Missing user or notebook. Please sign in again.");
+            return;
+        }
+
         setLoading(true)
         dispatch(addMessageInChatHistory(newMessage))
 
-
-        const data = await sendChatMessage({ userId, noteId, query: inputValue || newMessage?.content })
-        setLoading(false)
-        setTimeout(scrollToBottom, 100);
-        dispatch(addMessageInChatHistory(data?.message))
-        
+        try {
+            const data = await sendChatMessage({
+                userId,
+                noteId,
+                query: newMessage.content,
+            })
+            if (data?.message) {
+                dispatch(addMessageInChatHistory(data.message))
+            } else {
+                showError("No response from assistant")
+            }
+        } catch {
+            showError("Failed to send message")
+        } finally {
+            setLoading(false)
+            setTimeout(scrollToBottom, 100);
+        }
     }
 
     const sendMessage = async () => {
         if (!inputValue.trim()) return;
 
+        const content = inputValue.trim();
+        setInputValue("");
+
         const newMessage: messageType = {
             role: "user",
-            content: inputValue,
-            userId, noteId
+            content,
+            userId,
+            noteId,
         };
 
         await sendUserMessage({ newMessage })
-       
     };
 
 
@@ -70,19 +95,10 @@ const MiddlePannel = ({ chatHistory, userId, note, aiResult }: { chatHistory: ch
     }
 
 
-    const onKeyDownMessage = async (e) => {
+    const onKeyDownMessage = async (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
-
-            const newMessage: messageType = {
-                role: "user",
-                content: inputValue,
-                userId, noteId
-            };
-            setInputValue("");
-            await sendUserMessage({ newMessage })
-            
-
+            await sendMessage();
         }
     };
 

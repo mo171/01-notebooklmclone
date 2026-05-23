@@ -15,8 +15,9 @@ import { uploadPickedFiles } from "@/api/notes";
 import { AddPasteTextForm } from "./AddPasteTextForm";
 import AddWebLinkForm from "./AddWebLinkForm";
 import AddYoutubeLinkForm from "./AddYoutubeForm";
-import { toggleDiscoveryModal } from "@/store/discoveryModalSlice";
-import { showInfo } from "@/util/toast-notification";
+import { showError, showInfo } from "@/util/toast-notification";
+import { fetchNoteSourceResult } from "@/store/rightPanelSlice";
+import { fetchSingleNote } from "@/store/chatSlice";
 
 
 
@@ -98,10 +99,19 @@ const CreateNoteModal = ({ noteId }: { noteId?: string }) => {
 
 
     useEffect(() => {
+        if (!data?.docs?.length || !noteId) return;
 
-        uploadPickedFiles(data?.docs, noteId)
-
-    }, [data])
+        (async () => {
+            try {
+                await uploadPickedFiles(data.docs, noteId);
+                await dispatch(fetchSingleNote(noteId));
+                dispatch(fetchNoteSourceResult(noteId));
+                showInfo("Google Drive file(s) added");
+            } catch {
+                showError("Failed to import Google Drive file(s)");
+            }
+        })();
+    }, [data, noteId, dispatch]);
 
 
     return (
@@ -197,6 +207,7 @@ const CreateNoteModal = ({ noteId }: { noteId?: string }) => {
 
 
 const UploadFileSection = ({ noteId }: { noteId?: string }) => {
+    const dispatch = useDispatch<AppDispatch>();
     const [isDragging, setIsDragging] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [loading, setLoading] = useState(false);
@@ -230,34 +241,47 @@ const UploadFileSection = ({ noteId }: { noteId?: string }) => {
     };
 
     const uploadFiles = async (files: FileList) => {
+        if (!noteId) {
+            showError("Open a notebook before uploading files");
+            return;
+        }
+
         setLoading(true);
         const formData = new FormData();
-        const userData = getUserData()
-        const userId = userData?._id
+        formData.append("noteId", noteId);
+
         Array.from(files).forEach((file) => {
             formData.append("doc", file);
-            formData.append("userId", userId)
-            formData.append("noteId", noteId as string)
-
         });
+
+        const accessToken = localStorage.getItem("accessToken");
+        const headers: Record<string, string> = {};
+        if (accessToken) {
+            headers.Authorization = `Bearer ${accessToken}`;
+        }
 
         try {
             const response = await fetch(`${apiUrl}/api/v1/notes/upload-files`, {
                 method: "POST",
+                headers,
                 body: formData,
             });
 
+            const data = await response.json().catch(() => ({}));
+
             if (!response.ok) {
-                throw new Error(`Upload failed: ${response.statusText}`);
+                throw new Error(data?.message ?? response.statusText);
             }
 
-            const data = await response.json();
-            console.log("Upload successful:", data);
-            showInfo('File uploaded successfully')
+            showInfo(data?.message ?? "File uploaded successfully");
+            await dispatch(fetchSingleNote(noteId));
+            dispatch(fetchNoteSourceResult(noteId));
             setLoading(false);
         } catch (error) {
             setLoading(false);
-
+            const message =
+                error instanceof Error ? error.message : "Upload failed";
+            showError(message);
             console.error("Error uploading files:", error);
         }
     };

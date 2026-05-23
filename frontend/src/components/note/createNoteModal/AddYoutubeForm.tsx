@@ -1,7 +1,3 @@
-
-
-
-
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -11,12 +7,13 @@ import { Loader2, MoveLeft } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { sendWeblink, sendYoutubeLink } from "@/api/notes";
+import { sendYoutubeLink } from "@/api/notes";
 import { useDispatch } from "react-redux";
 import type { AppDispatch } from "@/store";
 import { fetchSingleNote } from "@/store/chatSlice";
+import { fetchNoteSourceResult } from "@/store/rightPanelSlice";
+import { showError, showSuccess } from "@/util/toast-notification";
 
-// 1. Schema validation with Zod
 const formSchema = z.object({
     youtubeLink: z
         .string()
@@ -26,9 +23,8 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-const AddYoutubeLinkForm = ({ hideYoutubeLinkForm,noteId }: { hideYoutubeLinkForm: () => void,noteId?:string }) => {
-    // 2. Setup react-hook-form with Zod resolver
-      const dispatch = useDispatch<AppDispatch>();
+const AddYoutubeLinkForm = ({ hideYoutubeLinkForm, noteId }: { hideYoutubeLinkForm: () => void, noteId?: string }) => {
+    const dispatch = useDispatch<AppDispatch>();
     const {
         register,
         handleSubmit,
@@ -38,16 +34,22 @@ const AddYoutubeLinkForm = ({ hideYoutubeLinkForm,noteId }: { hideYoutubeLinkFor
         resolver: zodResolver(formSchema),
     });
 
-    // 3. Submission handler
     const onSubmit = async (data: FormValues) => {
+        if (!noteId) {
+            showError("Open a notebook before adding a YouTube link");
+            return;
+        }
 
-      await  sendYoutubeLink(data?.youtubeLink,noteId)
-       dispatch(fetchSingleNote(noteId as string))
-      
-
-        // Reset form after submit
-        reset();
-        // hideWebLinkForm();
+        try {
+            await sendYoutubeLink(data.youtubeLink, noteId);
+            await dispatch(fetchSingleNote(noteId));
+            dispatch(fetchNoteSourceResult(noteId));
+            showSuccess("YouTube source added");
+            reset();
+            hideYoutubeLinkForm();
+        } catch {
+            showError("Failed to add YouTube link");
+        }
     };
 
     return (
@@ -63,7 +65,7 @@ const AddYoutubeLinkForm = ({ hideYoutubeLinkForm,noteId }: { hideYoutubeLinkFor
 
             <Textarea
                 id="link"
-                placeholder="https://www.npmjs.com/package/react-google-drive-picker"
+                placeholder="https://www.youtube.com/watch?v=..."
                 className="resize-y min-h-[100px] mt-2 text-sm placeholder:text-sm"
                 {...register("youtubeLink")}
             />
@@ -93,5 +95,4 @@ const AddYoutubeLinkForm = ({ hideYoutubeLinkForm,noteId }: { hideYoutubeLinkFor
     );
 };
 
-// 
 export default AddYoutubeLinkForm;

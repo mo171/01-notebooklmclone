@@ -34,8 +34,34 @@ async function loadFromUpload(uploadPath: string): Promise<Document[]> {
   const ext = path.extname(uploadPath).toLowerCase();
 
   if (ext === ".pdf") {
-    const loader = new PDFLoader(uploadPath);
-    return loader.load();
+    try {
+      const loader = new PDFLoader(uploadPath);
+      return loader.load();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes("pdf-parse") || message.includes("Cannot find module")) {
+        throw new Error(
+          "PDF support requires pdf-parse. Run: npm install pdf-parse --prefix backend",
+        );
+      }
+      throw err;
+    }
+  }
+
+  const textExtensions = new Set([
+    ".txt",
+    ".md",
+    ".markdown",
+    ".csv",
+    ".json",
+    ".html",
+    ".htm",
+  ]);
+
+  if (!textExtensions.has(ext) && ext !== "") {
+    throw new Error(
+      `Unsupported file type "${ext}". Use PDF, TXT, Markdown, or paste text instead.`,
+    );
   }
 
   const raw = await fs.readFile(uploadPath, "utf-8");

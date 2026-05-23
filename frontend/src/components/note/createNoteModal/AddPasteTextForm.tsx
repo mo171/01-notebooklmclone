@@ -9,12 +9,14 @@ import { sendTextData } from "@/api/notes";
 import { useDispatch, useSelector } from "react-redux";
 import type { AppDispatch, RootState } from "@/store";
 import { fetchSingleNote } from "@/store/chatSlice";
+import { fetchNoteSourceResult } from "@/store/rightPanelSlice";
+import { showError, showSuccess } from "@/util/toast-notification";
 
 const pasteTextSchema = z.object({
     text: z
         .string()
-        .min(50, "Text must be at least 50 characters")
-        .max(5000, "Text is too long"),
+        .min(10, "Text must be at least 10 characters")
+        .max(50000, "Text is too long"),
 });
 
 type PasteTextFormValues = z.infer<typeof pasteTextSchema>;
@@ -35,13 +37,21 @@ export const AddPasteTextForm = ({ hidePasteTextForm, noteId }: { hidePasteTextF
     });
 
     const onSubmit = async (data: PasteTextFormValues) => {
+        if (!noteId) {
+            showError("Open a notebook before pasting text");
+            return;
+        }
 
-        await sendTextData(data?.text, noteId)
-         dispatch(fetchSingleNote(noteId as string))
-        reset()
-        console.log("✅ Submitted Paste Text:", data);
-
-        // hidePasteTextForm();
+        try {
+            await sendTextData(data.text, noteId);
+            await dispatch(fetchSingleNote(noteId));
+            dispatch(fetchNoteSourceResult(noteId));
+            showSuccess("Text source added");
+            reset();
+            hidePasteTextForm();
+        } catch {
+            showError("Failed to add pasted text");
+        }
     };
 
     return (
