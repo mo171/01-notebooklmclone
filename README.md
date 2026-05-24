@@ -7,11 +7,6 @@ Overview / Explanation video: https://drive.google.com/file/d/1YW3JpBKrfsxo_AJdI
 
 Comprehensive local notebook + RAG + assistant demo. This README explains the project, how files are handled (uploads, Drive, URLs, generated images), how the chat remembers conversations, environment variables, and how to run and extend the project.
 
-**Banner:** Place the provided banner image at `docs/banner.png`. The README displays it above when the image file is present.
-
-**Quick links:**
-- **Backend:** [backend/src](backend/src)
-- **Frontend:** [frontend/src](frontend/src)
 
 **Features**
 - Import documents from URL, Google Drive, uploads, and YouTube links.
