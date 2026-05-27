@@ -1,20 +1,20 @@
 import { Request, Response, NextFunction } from "express";
 import { Types } from "mongoose";
 import { HumanMessage } from "@langchain/core/messages";
-import { ChatOpenAI } from "@langchain/openai";
 import { PromptTemplate } from "@langchain/core/prompts";
-import { JsonOutputParser } from "@langchain/core/output_parsers";
 import { User } from "@/app/bootstrap/models/userSchema";
 import { Chat } from "@/app/bootstrap/models/chatSchema";
 import { Doc } from "@/app/bootstrap/models/docSchema";
 import { chatGraphApp } from "@/app/pipeline/qa-overdoc";
+import { createChatModel } from "@/util/index";
+import { JsonOutputParser } from "@langchain/core/output_parsers";
 
 // ── LLM for doc overview ──────────────────────────────────────────────────────
-const llm = new ChatOpenAI({
-  model: "gpt-4o-mini",
-  temperature: 0.3,
-  apiKey: process.env.OPENAI_API_KEY,
-});
+const llm = createChatModel({ temperature: 0.3 });
+const docOverviewParser = new JsonOutputParser<{
+  doc_overview: string;
+  questions: string[];
+}>();
 
 const docOverviewPrompt = PromptTemplate.fromTemplate(`
 You are a document analysis assistant. Given the following document content, your task is to:
@@ -137,14 +137,16 @@ export async function getDocOverview(req: Request, res: Response, next: NextFunc
       .join("\n\n")
       .slice(0, 8000); // cap to avoid token overflow
 
-    const parser = new JsonOutputParser<{ doc_overview: string; questions: string[] }>();
-    const chain = docOverviewPrompt.pipe(llm).pipe(parser);
-
     let aiResult = { doc_overview: "", questions: [] as string[] };
     try {
-      aiResult = await chain.invoke({ content: combinedContent });
+      aiResult = await docOverviewPrompt.pipe(llm).pipe(docOverviewParser).invoke({
+        content: combinedContent,
+      });
     } catch (e) {
-      console.error("[chatController] doc overview parse failed:", e);
+      console.error(
+        "[chatController] doc overview generation failed:",
+        e instanceof Error ? e.message : e,
+      );
     }
 
     return res.json({ aiResult });

@@ -10,19 +10,15 @@ import {
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import { CheerioWebBaseLoader } from "@langchain/community/document_loaders/web/cheerio";
 
-import { ChatOpenAI } from "@langchain/openai";
 import "dotenv/config";
+import { createChatModel, splitIntoBatches } from "@/util/index";
 
 // ── LLM ─────────────────────────────────────────────────────────────────────
 
 // ── LLM ─────────────────────────────────────────────────────────────────────
 
-const llm = new ChatOpenAI({
-	model: "gpt-4o-mini",
-	temperature: 0.3,
-	maxRetries: 2,
-	apiKey: process.env.OPENAI_API_KEY,
-});
+const llm = createChatModel({ temperature: 0.2 });
+const BRIEFING_BATCH_SIZE = Number(process.env.BRIEFING_BATCH_SIZE ?? 5);
 
 // ── Token helpers (approximate) ─────────────────────────────────────────────
 
@@ -88,39 +84,39 @@ const OverallState = Annotation.Root({
 	finalBriefing: Annotation<string>,
 });
 
-interface BriefingState {
-	content: string;
+interface BriefingBatchState {
+	contents: string[];
 }
 
 // ── Node functions ──────────────────────────────────────────────────────────
 
-// Map: Generate briefing for a single chunk
+// Map: Generate briefing for a batch of chunks
 const generateBriefingChunk = async (
-	state: BriefingState,
+	state: BriefingBatchState,
 ): Promise<{ briefingChunks: string[] }> => {
 	const mapPrompt = ChatPromptTemplate.fromMessages([
 		[
 			"user",
-			`Create a professional briefing document for the following text.
+ 			`Create one professional briefing document for the grouped text below.
 Include:
-- Summary of main ideas
-- Key takeaways
-- Actionable insights or recommendations
-Format as concise, clear paragraphs:\n\n{context}`,
+Combine overlapping ideas and keep the output concise, clear paragraphs.\n\n{context}`,
 		],
 	]);
 
-	const prompt = await mapPrompt.invoke({ context: state.content });
+	const prompt = await mapPrompt.invoke({
+		context: state.contents
+			.map((chunk, index) => `Chunk ${index + 1}:\n${chunk}`)
+			.join("\n\n"),
+	});
 	const response = await llm.invoke(prompt);
 
 	return { briefingChunks: [String(response.content)] };
 };
 
-// Map logic
+// Group chunks before sending them to the LLM
 const mapBriefingChunks = (state: typeof OverallState.State) => {
-	return state.contents.map(
-		(content) => new Send("generateBriefingChunk", { content }),
-	);
+	const batches = splitIntoBatches(state.contents, BRIEFING_BATCH_SIZE);
+	return batches.map((contents) => new Send("generateBriefingChunk", { contents }));
 };
 
 // Collect all chunks into Documents

@@ -5,18 +5,15 @@ import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import { CheerioWebBaseLoader } from "@langchain/community/document_loaders/web/cheerio";
 
-import { ChatOpenAI } from "@langchain/openai";
 import "dotenv/config";
+import { createChatModel, splitIntoBatches } from "@/util/index";
 
 // ── LLM ──────────────────────────────────────────────────────────────────────
 
 // ── LLM ──────────────────────────────────────────────────────────────────────
 
-const llm = new ChatOpenAI({
-  model: "gpt-4o-mini",
-  temperature: 0.7,
-  apiKey: process.env.OPENAI_API_KEY,
-});
+const llm = createChatModel({ temperature: 0.7 });
+const SUMMARY_BATCH_SIZE = Number(process.env.SUMMARY_BATCH_SIZE ?? 5);
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -87,27 +84,35 @@ interface SummaryState {
   content: string;
 }
 
+interface SummaryBatchState {
+  contents: string[];
+}
+
 // ── Node functions ───────────────────────────────────────────────────────────
 
-// Here we generate a summary, given a document
+// Here we generate a summary for a batch of chunks
 const generateSummary = async (
-  state: SummaryState,
+  state: SummaryBatchState,
 ): Promise<{ summaries: string[] }> => {
   const prompt = ChatPromptTemplate.fromMessages([
-    ["human", "Write a concise summary of the following:\n\n{context}"],
+    [
+      "human",
+      "Write one concise summary for the grouped chunks below. Combine repeated ideas and keep the output focused.\n\n{context}",
+    ],
   ]);
   const chain = prompt.pipe(llm);
-  const response = await chain.invoke({ context: state.content });
+  const response = await chain.invoke({
+    context: state.contents
+      .map((chunk, index) => `Chunk ${index + 1}:\n${chunk}`)
+      .join("\n\n"),
+  });
   return { summaries: [response.content as string] };
 };
 
-// Here we define the logic to map out over the documents
-// We will use this an edge in the graph
+// Group chunks before sending them to the LLM
 const mapSummaries = (state: typeof OverallState.State) => {
-  // Send each content chunk to the generateSummary node
-  return state.contents.map(
-    (content) => new Send("generateSummary", { content }),
-  );
+  const batches = splitIntoBatches(state.contents, SUMMARY_BATCH_SIZE);
+  return batches.map((contents) => new Send("generateSummary", { contents }));
 };
 
 // Here we will collect all the summaries and collapse them into Document objects
@@ -199,7 +204,7 @@ export async function generateSummaryPipeline(content: string): Promise<string> 
     chunkSize: 1000,
     chunkOverlap: 200,
   });
-  
+
   const docs = await textSplitter.createDocuments([content]);
   const splitDocs = await textSplitter.splitDocuments(docs);
 

@@ -1,7 +1,7 @@
 import { PromptTemplate } from "@langchain/core/prompts";
-import { ChatOpenAI } from "@langchain/openai";
 import { z } from "zod";
 import "dotenv/config";
+import { createChatModel } from "@/util/index";
 
 type MindElixirNode = {
 	id: string;
@@ -68,18 +68,7 @@ function collectTopicsViolations(
 }
 
 function createMindMapLlm() {
-	const openaiKey = process.env.OPENAI_API_KEY;
-
-	if (!openaiKey) {
-		throw new Error("Missing OPENAI_API_KEY. Mind map generation requires OpenAI.");
-	}
-
-	return new ChatOpenAI({
-		model: "gpt-4o-mini",
-		temperature: 0.5,
-		maxRetries: 2,
-		apiKey: openaiKey,
-	});
+	return createChatModel({ temperature: 0.5 });
 }
 
 const mindElixirShapeExample = `{

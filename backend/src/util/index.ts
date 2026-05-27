@@ -1,7 +1,25 @@
 import { Document } from "@langchain/core/documents";
-import { ChatOpenAI } from "@langchain/openai";
+import { ChatGroq } from "@langchain/groq";
 import z from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
+
+type CreateChatModelOptions = {
+  temperature?: number;
+  maxRetries?: number;
+};
+
+export function createChatModel(options: CreateChatModelOptions = {}) {
+  if (!process.env.GROK_API_KEY) {
+    throw new Error("Missing GROK_API_KEY");
+  }
+
+  return new ChatGroq({
+    apiKey: process.env.GROK_API_KEY,
+    model: "openai/gpt-oss-20b",
+    temperature: options.temperature ?? 0.5,
+    maxRetries: options.maxRetries ?? 2,
+  });
+}
 
 export function extractMessage(state: any, messageType: "ai" | "human") {
   const lastMessage = state.messages
@@ -10,12 +28,7 @@ export function extractMessage(state: any, messageType: "ai" | "human") {
   return lastMessage;
 }
 
-export const llm = new ChatOpenAI({
-  model: "gpt-4o-mini",
-  temperature: 0.5,
-  maxRetries: 2,
-  apiKey: process.env.OPENAI_API_KEY,
-});
+export const llm = createChatModel();
 
 export const gradeDocResponseFormater = {
   response_format: {
@@ -51,6 +64,17 @@ export function splitListOfDocs(docs: Document[], chunkSize: number) {
     chunks.push(docs.slice(i, i + chunkSize));
   }
   return chunks;
+}
+
+export function splitIntoBatches<T>(items: T[], batchSize: number) {
+  const safeBatchSize = Number.isFinite(batchSize) && batchSize > 0 ? Math.floor(batchSize) : 1;
+  const batches: T[][] = [];
+
+  for (let index = 0; index < items.length; index += safeBatchSize) {
+    batches.push(items.slice(index, index + safeBatchSize));
+  }
+
+  return batches;
 }
 
 export function collapseDocs(docs: Document[]) {

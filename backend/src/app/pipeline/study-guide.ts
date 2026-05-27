@@ -10,19 +10,15 @@ import {
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import { CheerioWebBaseLoader } from "@langchain/community/document_loaders/web/cheerio";
 
-import { ChatOpenAI } from "@langchain/openai";
 import "dotenv/config";
+import { createChatModel, splitIntoBatches } from "@/util/index";
 
 // ── LLM ─────────────────────────────────────────────────────────────────────
 
 // ── LLM ─────────────────────────────────────────────────────────────────────
 
-const llm = new ChatOpenAI({
-	model: "gpt-4o-mini",
-	temperature: 0.5,
-	maxRetries: 2,
-	apiKey: process.env.OPENAI_API_KEY,
-});
+const llm = createChatModel({ temperature: 0.5 });
+const STUDY_GUIDE_BATCH_SIZE = Number(process.env.STUDY_GUIDE_BATCH_SIZE ?? 5);
 
 // ── Token helpers (approximate) ─────────────────────────────────────────────
 
@@ -89,24 +85,26 @@ const OverallState = Annotation.Root({
 	finalStudyGuide: Annotation<string>,
 });
 
-interface StudyGuideState {
-	content: string;
+interface StudyGuideBatchState {
+	contents: string[];
 }
 
 // ── Node functions ──────────────────────────────────────────────────────────
 
+// Generate a study guide for a batch of chunks
 const generateStudyGuideChunk = async (
-	state: StudyGuideState,
+	state: StudyGuideBatchState,
 ): Promise<{ studyGuides: string[] }> => {
 	const prompt = ChatPromptTemplate.fromMessages([
 		[
 			"human",
-			`Write a study guide chunk for the following content.
+ 			`Write one study guide for the grouped content below.
 
 Requirements:
 - Capture key concepts, definitions, and main points
 - Preserve important examples when present
 - Use clear structure (short headings + bullet points when helpful)
+			- Combine overlapping points from the grouped chunks into a single output
 
 Content:
 {content}`,
@@ -114,15 +112,18 @@ Content:
 	]);
 
 	const chain = prompt.pipe(llm);
-	const response = await chain.invoke({ content: state.content });
+	const response = await chain.invoke({
+		content: state.contents
+			.map((chunk, index) => `Chunk ${index + 1}:\n${chunk}`)
+			.join("\n\n"),
+	});
 	return { studyGuides: [String(response.content)] };
 };
 
-// Map logic
+// Group chunks before sending them to the LLM
 const mapStudyGuides = (state: typeof OverallState.State) => {
-	return state.contents.map(
-		(content) => new Send("generateStudyGuideChunk", { content }),
-	);
+	const batches = splitIntoBatches(state.contents, STUDY_GUIDE_BATCH_SIZE);
+	return batches.map((contents) => new Send("generateStudyGuideChunk", { contents }));
 };
 
 // Collect all chunks into Documents

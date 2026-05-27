@@ -10,19 +10,15 @@ import {
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import { CheerioWebBaseLoader } from "@langchain/community/document_loaders/web/cheerio";
 
-import { ChatOpenAI } from "@langchain/openai";
 import "dotenv/config";
+import { createChatModel, splitIntoBatches } from "@/util/index";
 
 // ── LLM ─────────────────────────────────────────────────────────────────────
 
 // ── LLM ─────────────────────────────────────────────────────────────────────
 
-const llm = new ChatOpenAI({
-	model: "gpt-4o-mini",
-	temperature: 0.2,
-	maxRetries: 2,
-	apiKey: process.env.OPENAI_API_KEY,
-});
+const llm = createChatModel({ temperature: 0.3 });
+const FAQ_BATCH_SIZE = Number(process.env.FAQ_BATCH_SIZE ?? 5);
 
 // ── Token helpers (approximate) ─────────────────────────────────────────────
 
@@ -88,36 +84,40 @@ const OverallState = Annotation.Root({
 	finalFAQ: Annotation<string>,
 });
 
-interface FAQState {
-	content: string;
+interface FAQBatchState {
+	contents: string[];
 }
 
 // ── Node functions ──────────────────────────────────────────────────────────
 
-// Map: Generate FAQ for a single chunk
+// Map: Generate FAQ for a batch of chunks
 const generateFAQChunk = async (
-	state: FAQState,
+  state: FAQBatchState,
 ): Promise<{ faqChunks: string[] }> => {
 	const mapPrompt = ChatPromptTemplate.fromMessages([
 		[
 			"user",
-			`Create a set of FAQs (questions and answers) from the following text.
+			`Create a single consolidated FAQ list from the grouped text below.
 Each FAQ should include:
-- A clear question
-- A concise, accurate answer
+Remove duplicates across chunks and keep the result compact.
 Format as a list of Q&A:\n\n{context}`,
 		],
 	]);
 
-	const prompt = await mapPrompt.invoke({ context: state.content });
+	const prompt = await mapPrompt.invoke({
+		context: state.contents
+			.map((chunk, index) => `Chunk ${index + 1}:\n${chunk}`)
+			.join("\n\n"),
+	});
 	const response = await llm.invoke(prompt);
 
 	return { faqChunks: [String(response.content)] };
 };
 
-// Map logic
+// Group chunks before sending them to the LLM
 const mapFAQChunks = (state: typeof OverallState.State) => {
-	return state.contents.map((content) => new Send("generateFAQChunk", { content }));
+	const batches = splitIntoBatches(state.contents, FAQ_BATCH_SIZE);
+	return batches.map((contents) => new Send("generateFAQChunk", { contents }));
 };
 
 // Collect all chunks into Documents

@@ -7,7 +7,6 @@ import {
 } from "@langchain/langgraph";
 import { PromptTemplate } from "@langchain/core/prompts";
 import { z } from "zod";
-import { ChatMistralAI } from "@langchain/mistralai";
 import dotenv from "dotenv";
 dotenv.config();
 import { queryVectorDB, rerankDocuments } from "./retriever";
