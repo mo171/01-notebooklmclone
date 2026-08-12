@@ -8,7 +8,7 @@ const HomePage = () => {
     
     }, [])
     
-    return (<div align="center">
+    return (<div className="text-center">
         <h1>Home page</h1>
     </div>);
 }

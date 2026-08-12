@@ -1,5 +1,8 @@
 import mongoose from "mongoose";
+import dns from "dns";
 
+// Workaround for Node.js DNS issues with certain IPv6 DNS servers (like Reliance Jio)
+dns.setServers(["8.8.8.8", "1.1.1.1"]);
 let memoryServer: { stop: () => Promise<boolean> } | null = null;
 
 export async function dbConnection() {

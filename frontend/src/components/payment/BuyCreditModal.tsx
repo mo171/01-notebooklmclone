@@ -189,7 +189,7 @@ const PricingPlan = ({ onSubmit, loading }: { onSubmit: (amount: number) => void
           </Button>
         </div>
       </div>
-      <div align="center" className="mb-2 pt-2">
+      <div className="mb-2 pt-2 text-center">
         {loading ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />

@@ -1,4 +1,4 @@
-import { getNoteChats, type chatHistoryType } from '@/api/notes';
+import { getNoteChats, type chatHistoryType, type messageType } from '@/api/notes';
 import { createSlice, configureStore, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit'
 
 
@@ -32,7 +32,7 @@ const chatHistorySlice = createSlice({
    
 
 
-    addMessageInChatHistory: (state, action: PayloadAction<{ role: string; content: string }>) => {
+    addMessageInChatHistory: (state, action: PayloadAction<messageType>) => {
       if (!state.chatHistory) {
         state.chatHistory = { chatHistory: [] };
       }

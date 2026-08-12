@@ -34,7 +34,6 @@ function normalizeMindMapPayload(input: unknown) {
 
 export const MindMapModel = () => {
   const containerRef = React.useRef<HTMLDivElement | null>(null);
-  const canvasRef = React.useRef<HTMLDivElement | null>(null);
   const mindInstanceRef = React.useRef<any>(null);
   const dispatch = useDispatch<AppDispatch>();
   const { mindMapModal } = useSelector((state: RootState) => state.rightPanel);
@@ -46,7 +45,7 @@ export const MindMapModel = () => {
       contentLength: mindMapModal.content?.length ?? 0,
     });
 
-    if (!mindMapModal.modal || !containerRef.current || !canvasRef.current || !mindMapModal.content) {
+    if (!mindMapModal.modal || !containerRef.current || !mindMapModal.content) {
       return;
     }
 
@@ -75,72 +74,86 @@ export const MindMapModel = () => {
 
     debugLog("MindMapSourceModal", "parsed mind map payload", mindMapData);
 
-    const options = {
-      el: canvasRef.current,
-      direction: MindElixir.SIDE,
-      draggable: true,
-      editable: true,
-      overflowHidden: false,
-    };
-
+    const container = containerRef.current;
     let destroyed = false;
-    let mounted = false;
-    let resizeObserver: ResizeObserver | null = null;
+    let mind: any = null;
+    let lastSize = "";
 
     const mountMindMap = () => {
-      if (destroyed || !containerRef.current) {
-        return false;
-      }
+      if (destroyed || mind) return;
 
-      const { clientWidth, clientHeight } = canvasRef.current ?? { clientWidth: 0, clientHeight: 0 };
+      const { clientWidth, clientHeight } = container;
       if (clientWidth === 0 || clientHeight === 0) {
-        debugLog("MindMapSourceModal", "waiting for canvas size", {
+        debugLog("MindMapSourceModal", "waiting for container size", {
           clientWidth,
           clientHeight,
         });
-        return false;
+        return;
       }
 
-      mindInstanceRef.current?.destroy?.();
-      canvasRef.current.innerHTML = "";
+      container.innerHTML = "";
 
-      const mind = new MindElixir(options);
-      mind.init(mindMapData);
-      requestAnimationFrame(() => {
-        mind.toCenter();
-        debugLog("MindMapSourceModal", "mind map mounted", {
-          nodeCount: canvasRef.current?.querySelectorAll("me-tpc").length ?? 0,
-          childCount: canvasRef.current?.children.length ?? 0,
-          innerHTMLLength: canvasRef.current?.innerHTML.length ?? 0,
-          scrollWidth: containerRef.current?.scrollWidth ?? 0,
-          scrollHeight: containerRef.current?.scrollHeight ?? 0,
-        });
+      const instance = new MindElixir({
+        el: container,
+        direction: MindElixir.SIDE,
+        draggable: true,
+        editable: true,
+        overflowHidden: false,
       });
 
-      mindInstanceRef.current = mind;
-      mounted = true;
-      return true;
+      // init() returns an Error instead of throwing when the payload is unusable.
+      const initError = instance.init(mindMapData);
+      if (initError instanceof Error) {
+        showError("Mind map data is invalid");
+        debugLog("MindMapSourceModal", "init rejected the payload", initError.message);
+        return;
+      }
+
+      mind = instance;
+      mindInstanceRef.current = instance;
+      debugLog("MindMapSourceModal", "mind map mounted", {
+        mountWidth: clientWidth,
+        mountHeight: clientHeight,
+        nodeCount: container.querySelectorAll("me-tpc").length,
+      });
     };
 
-    if (!mountMindMap()) {
-      resizeObserver = new ResizeObserver(() => {
-        if (mountMindMap()) {
-          resizeObserver?.disconnect();
-          resizeObserver = null;
-        }
-      });
-      resizeObserver.observe(containerRef.current);
-    }
+    mountMindMap();
+
+    // mind-elixir centres the canvas exactly once, using the container size it
+    // sees at init time, and never re-centres afterwards. Radix mounts the
+    // dialog before it settles at its final width, so the map ends up
+    // translated hundreds of px to the left and is clipped away by
+    // `.map-container { overflow: hidden }` — it looks like nothing rendered.
+    // Keep observing for the map's whole lifetime and re-centre on every
+    // resize (this also handles window resizes).
+    const resizeObserver = new ResizeObserver(() => {
+      if (destroyed) return;
+
+      if (!mind) {
+        mountMindMap();
+        return;
+      }
+
+      const { clientWidth, clientHeight } = container;
+      if (clientWidth === 0 || clientHeight === 0) return;
+
+      const size = `${clientWidth}x${clientHeight}`;
+      if (size === lastSize) return;
+      lastSize = size;
+
+      mind.toCenter();
+      debugLog("MindMapSourceModal", "re-centred after resize", { size });
+    });
+    resizeObserver.observe(container);
 
     return () => {
       destroyed = true;
-      resizeObserver?.disconnect();
-      resizeObserver = null;
-      mindInstanceRef.current?.destroy?.();
+      resizeObserver.disconnect();
+      mind?.destroy?.();
+      mind = null;
       mindInstanceRef.current = null;
-      if (containerRef.current) {
-        containerRef.current.innerHTML = "";
-      }
+      container.innerHTML = "";
     };
   }, [mindMapModal.modal, mindMapModal.content]);
 
@@ -157,24 +170,15 @@ export const MindMapModel = () => {
       <div
         ref={containerRef}
         style={{
-          height: "600px",
+          // Shrink with the viewport so the map never overflows the dialog on
+          // short screens; the ResizeObserver re-centres whenever this changes.
+          height: "min(600px, calc(100vh - 12rem))",
+          minHeight: "300px",
           width: "100%",
           position: "relative",
-          overflow: "auto",
           background: "#1f1f1f",
         }}
-      >
-        <div
-          ref={canvasRef}
-          style={{
-            width: "5000px",
-            height: "5000px",
-            minWidth: "5000px",
-            minHeight: "5000px",
-            position: "relative",
-          }}
-        />
-      </div>
+      />
     </BaseModal>
   );
 };

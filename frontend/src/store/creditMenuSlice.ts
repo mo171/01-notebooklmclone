@@ -18,7 +18,7 @@ const creditMenuState= {
   } as CreditMenuStateType
  ,
  loading:false,
-  error: null,
+  error: null as string | null,
 };
 
 

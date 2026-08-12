@@ -33,7 +33,7 @@ const MiddlePannel = ({ chatHistory, userId, note, noteId: routeNoteId, aiResult
     const [inputValue, setInputValue] = useState("");
     const [loading, setLoading] = useState(false);
 
-    const chatContainerRef = useRef<HTMLElement>(null);
+    const chatContainerRef = useRef<HTMLDivElement>(null);
     const [showScrollButton, setShowScrollButton] = useState(false);
 
 
@@ -98,7 +98,7 @@ const MiddlePannel = ({ chatHistory, userId, note, noteId: routeNoteId, aiResult
     }
 
 
-    const onKeyDownMessage = async (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    const onKeyDownMessage = async (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
             await sendMessage();

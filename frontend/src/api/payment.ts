@@ -1,4 +1,4 @@
-import { makeHttpReq } from "@/helper/makeHttpReq";
+import { getErrorMessage, makeHttpReq } from "@/helper/makeHttpReq";
 import { showError } from "@/util/toast-notification";
 
 export async function addPaymentMethod({ userId, email }: { userId: string, email: string }) {
@@ -9,7 +9,7 @@ export async function addPaymentMethod({ userId, email }: { userId: string, emai
         window.open(data?.url)
 
     } catch (error) {
-        console.log('error :', error?.message)
+        console.log('error :', getErrorMessage(error))
 
     }
 }

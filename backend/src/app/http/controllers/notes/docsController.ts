@@ -80,6 +80,22 @@ async function createDocFromContent(
   return doc;
 }
 
+/**
+ * Earlier versions renamed the source doc on every artifact generation, so
+ * stored titles can look like "Mind Map: Audio Overview: report.pdf". Strip any
+ * such prefixes so labels are derived cleanly from the real title.
+ */
+const ARTIFACT_TITLE_PREFIX =
+  /^(Mind Map|Audio Overview|Briefing Doc|Summary|FAQ|Study Guide):\s*/i;
+
+function baseTitle(title?: string): string {
+  let clean = title ?? "";
+  while (ARTIFACT_TITLE_PREFIX.test(clean)) {
+    clean = clean.replace(ARTIFACT_TITLE_PREFIX, "");
+  }
+  return clean || title || "Untitled";
+}
+
 // ── Controllers ──────────────────────────────────────────────────────────────
 
 /** POST /api/v1/blank/notes — create an empty notebook */
@@ -281,39 +297,83 @@ export async function getNoteDocs(req: Request, res: Response, next: NextFunctio
     }).sort({ createdAt: -1 });
 
     const sources = docs
-      .map((doc) => {
-      let source_type = "doc";
-      let content = doc.description ?? "";
+      .flatMap((doc) => {
+        const results = [];
+        const title = baseTitle(doc.title);
 
-      if (doc.mindMap) {
-        source_type = "mindMap";
-        content = doc.mindMap ?? "";
-      } else if (doc.briefingDoc) {
-        source_type = doc.title?.toLowerCase().includes("audio")
-          ? "audio"
-          : "briefing-doc";
-        content = doc.briefingDoc ?? "";
-      } else if (doc.summary) {
-        source_type = "summary";
-        content = doc.summary ?? "";
-      } else if (doc.FAQ) {
-        source_type = "faq";
-        content = doc.FAQ ?? "";
-      } else if (doc.studyGuide) {
-        source_type = "studyguide";
-        content = doc.studyGuide ?? "";
-      }
+        results.push({
+          _id: doc._id.toString() + "-original",
+          title,
+          content: doc.description ?? "",
+          source_type: "doc",
+          total_source: 1,
+          noteId,
+          userId: user._id,
+        });
 
-      return {
-        _id: doc._id,
-        title: doc.title,
-        content,
-        source_type,
-        total_source: 1,
-        noteId,
-        userId: user._id,
-      };
-    });
+        if (doc.mindMap) {
+          results.push({
+            _id: doc._id.toString() + "-mindMap",
+            title: `Mind Map: ${title}`,
+            content: doc.mindMap,
+            source_type: "mindMap",
+            total_source: 1,
+            noteId,
+            userId: user._id,
+          });
+        }
+        if (doc.briefingDoc) {
+          // Prefer the stored flavour; fall back to the legacy title sniff for
+          // docs written before briefingType existed.
+          const isAudio = doc.briefingType
+            ? doc.briefingType === "audio"
+            : !!doc.title?.toLowerCase().includes("audio");
+          results.push({
+            _id: doc._id.toString() + "-briefingDoc",
+            title: `${isAudio ? "Audio Overview" : "Briefing Doc"}: ${title}`,
+            content: doc.briefingDoc,
+            source_type: isAudio ? "audio" : "briefing-doc",
+            total_source: 1,
+            noteId,
+            userId: user._id,
+          });
+        }
+        if (doc.summary) {
+          results.push({
+            _id: doc._id.toString() + "-summary",
+            title: `Summary: ${title}`,
+            content: doc.summary,
+            source_type: "summary",
+            total_source: 1,
+            noteId,
+            userId: user._id,
+          });
+        }
+        if (doc.FAQ) {
+          results.push({
+            _id: doc._id.toString() + "-faq",
+            title: `FAQ: ${title}`,
+            content: doc.FAQ,
+            source_type: "faq",
+            total_source: 1,
+            noteId,
+            userId: user._id,
+          });
+        }
+        if (doc.studyGuide) {
+          results.push({
+            _id: doc._id.toString() + "-studyguide",
+            title: `Study Guide: ${title}`,
+            content: doc.studyGuide,
+            source_type: "studyguide",
+            total_source: 1,
+            noteId,
+            userId: user._id,
+          });
+        }
+
+        return results;
+      });
 
     return res.json({ sources });
   } catch (err) {

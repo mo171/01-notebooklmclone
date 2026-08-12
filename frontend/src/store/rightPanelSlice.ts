@@ -13,7 +13,7 @@ export const fetchNoteSourceResult = createAsyncThunk(
 const sourceNoteResultState = {
     sources: [] as Array<{ _id?: string; total_source: number; content: string; noteId: string; userId: string; title?: string; source_type?: string }>,
     loading: false,
-    error: null,
+    error: null as string | null,
     sourceModal: { modal: false, title: "", content: "", source_type: "" },
     mindMapModal: { modal: false, title: "", content: "", source_type: "" },
     audioCard: { show: false, title: "", content: "", source_type: "",sourceSectionHeight:100 }
@@ -53,16 +53,20 @@ export const rightPanelSlice = createSlice({
 
 
         showSourceModalContent: (state, action: PayloadAction<{ title: string, content: string, source_type: string }>) => {
+            // Compare case-insensitively: the API sends "mindMap" but callers
+            // have used "mindmap" too, and a mismatch silently routed the mind
+            // map into the plain-text modal.
+            const sourceType = (action.payload?.source_type ?? "").toLowerCase()
 
-            if (action.payload.source_type.includes('mindMap')) {
+            if (sourceType.includes('mindmap')) {
                 state.mindMapModal.title = action.payload?.title
                 state.mindMapModal.content = action.payload?.content
                 state.mindMapModal.source_type = action.payload?.source_type
                 state.mindMapModal.modal = true
             }
             else if (
-                action.payload.source_type.includes('audio') ||
-                action.payload.source_type.includes('briefing')
+                sourceType.includes('audio') ||
+                sourceType.includes('briefing')
             ) {
                 state.sourceModal.modal = true
                 state.sourceModal.title = action.payload?.title

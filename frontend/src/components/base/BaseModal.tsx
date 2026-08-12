@@ -35,12 +35,13 @@ export function BaseModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         style={{
-
-          width: "500vw",
-          maxWidth: width + "px",
-          height: height + "px",
-          background:background
-
+          // `width: 500vw` used to let the dialog exceed the viewport (a 1450px
+          // modal on a 1280px screen hung 85px off each edge). Clamp to the
+          // viewport so the modal is always fully visible.
+          width: "100%",
+          maxWidth: `min(${width}px, calc(100vw - 2rem))`,
+          height: `min(${height}px, calc(100vh - 2rem))`,
+          background: background,
         }}>
         {(title || description) && (
           <DialogHeader>

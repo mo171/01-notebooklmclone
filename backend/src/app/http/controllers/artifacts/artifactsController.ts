@@ -192,10 +192,12 @@ export async function saveBriefingDocToSources(req: Request, res: Response, next
       const content = doc.description ?? "";
       if (!content) continue;
       const briefingDoc = await generateBriefingDocPipeline(content);
-      const titlePrefix = isAudio ? "Audio Overview" : "Briefing Doc";
+      // Don't rename the source doc — the artifact label is derived on read.
+      // Renaming corrupted the left-panel source list and compounded on every
+      // regeneration ("Audio Overview: Briefing Doc: My File").
       await Doc.findByIdAndUpdate(doc._id, {
         briefingDoc,
-        title: `${titlePrefix}: ${doc.title}`,
+        briefingType: isAudio ? "audio" : "briefing-doc",
       });
     }
 
@@ -242,10 +244,8 @@ export async function saveMindMapToSources(req: Request, res: Response, next: Ne
       console.log("[artifactsController] mindMap nodeData:",
         typeof mindMap === "string" ? mindMap : JSON.stringify(mindMap.nodeData, null, 2),
       );
-      await Doc.findByIdAndUpdate(doc._id, {
-        mindMap: mindMapJson,
-        title: `Mind Map: ${doc.title}`,
-      });
+      // See saveBriefingDocToSources — the source doc keeps its own title.
+      await Doc.findByIdAndUpdate(doc._id, { mindMap: mindMapJson });
       console.log("[artifactsController] saved mindMap length:", mindMapJson.length);
       updatedCount += 1;
     }
